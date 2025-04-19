@@ -58,6 +58,7 @@ class Jugador(models.Model):
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='jugadores')
     fecha_registro = models.DateTimeField(auto_now_add=True)
     nivel = models.PositiveSmallIntegerField(choices=NIVEL_CHOICES, blank=True, null=True, verbose_name='Nivel')
+    cedula_imagen = models.ImageField(upload_to='cedulas_jugadores/', blank=True, null=True, verbose_name='Imagen de la cédula')
 
     def __str__(self):
         nombres = f"{self.primer_nombre} {self.segundo_nombre or ''}".strip()
