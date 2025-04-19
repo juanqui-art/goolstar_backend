@@ -17,11 +17,17 @@ class JugadorAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'cedula', 'equipo', 'nivel')
     list_filter = ('equipo__categoria', 'equipo')
     search_fields = ('primer_nombre', 'primer_apellido', 'cedula')
+    ordering = ('primer_apellido',)
+    list_per_page = 25
 
 @admin.register(Jornada)
 class JornadaAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'numero', 'fecha')
     list_filter = ('fecha',)
+
+class GolInline(admin.TabularInline):
+    model = Gol
+    extra = 1
 
 @admin.register(Partido)
 class PartidoAdmin(admin.ModelAdmin):
@@ -29,6 +35,9 @@ class PartidoAdmin(admin.ModelAdmin):
     list_filter = ('jornada', 'jugado', 'equipo_1__categoria')
     search_fields = ('equipo_1__nombre', 'equipo_2__nombre')
     date_hierarchy = 'fecha'
+    ordering = ('-fecha',)
+    list_per_page = 25
+    inlines = [GolInline]
 
 @admin.register(Gol)
 class GolAdmin(admin.ModelAdmin):
