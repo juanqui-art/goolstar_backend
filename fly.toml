@@ -1,0 +1,24 @@
+app = "goolstar-backend"
+primary_region = "mia"  # Miami, puedes cambiarlo a una región más cercana a ti
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8000"
+
+[http_service]
+  internal_port = 8000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+  processes = ["app"]
+
+[[statics]]
+  guest_path = "/app/staticfiles"
+  url_prefix = "/static"
+
+[mounts]
+  source = "goolstar_data"
+  destination = "/app/media"
