@@ -95,12 +95,19 @@ class Partido(models.Model):
 
         # Guardar el partido
         super().save(*args, **kwargs)
-
-        # Si el partido fue completado, actualizar estadísticas
+        
+        # Marcamos si el partido fue completado para que lo procese la señal post_save
         if is_newly_completed:
-            # Actualizar estadísticas de equipos
-            from .estadisticas import EstadisticaEquipo
+            self._actualizar_estadisticas = True
 
+    def actualizar_estadisticas_post_save(self):
+        """Método para actualizar estadísticas después de guardar, 
+        diseñado para ser llamado desde una señal post_save"""
+        from .estadisticas import EstadisticaEquipo
+        from django.db import transaction
+        
+        # Usar transacción atómica para la actualización completa
+        with transaction.atomic():
             # Asegurar que existen las estadísticas para ambos equipos
             for equipo in [self.equipo_1, self.equipo_2]:
                 estadistica, created = EstadisticaEquipo.objects.get_or_create(
@@ -118,11 +125,13 @@ class Partido(models.Model):
     # Métodos para trabajar con participaciones
     def get_participaciones_equipo(self, equipo):
         """Obtiene todas las participaciones de un equipo en este partido"""
+        # Importación local para evitar dependencias circulares
         from .participacion import ParticipacionJugador
         return ParticipacionJugador.objects.filter(partido=self, jugador__equipo=equipo)
 
     def get_jugadores_titulares(self, equipo):
         """Obtiene jugadores titulares de un equipo"""
+        # Importación local para evitar dependencias circulares
         from .participacion import ParticipacionJugador
         return ParticipacionJugador.objects.filter(
             partido=self,
@@ -132,6 +141,7 @@ class Partido(models.Model):
 
     def get_jugadores_salen(self, equipo):
         """Obtiene jugadores que salen durante el partido"""
+        # Importación local para evitar dependencias circulares
         from .participacion import ParticipacionJugador
         return ParticipacionJugador.objects.filter(
             partido=self,
@@ -141,6 +151,7 @@ class Partido(models.Model):
 
     def get_cambios_realizados(self, equipo):
         """Cuenta los cambios realizados por un equipo"""
+        # Importación local para evitar dependencias circulares
         from .participacion import ParticipacionJugador
         # Contar jugadores que entraron como cambio
         return ParticipacionJugador.objects.filter(

@@ -12,6 +12,8 @@ from .participantes import Jugador
 
 class ParticipacionJugador(models.Model):
     """Registro detallado de participación de jugadores en cada partido"""
+    # Usamos el string del modelo para evitar dependencias circulares
+    # Alternativa: mover este modelo al archivo competicion.py
     partido = models.ForeignKey('api.Partido', on_delete=models.CASCADE, related_name='participaciones')
     jugador = models.ForeignKey(Jugador, on_delete=models.CASCADE, related_name='participaciones')
     es_titular = models.BooleanField(default=True)

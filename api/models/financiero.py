@@ -26,8 +26,8 @@ class TipoTransaccion(models.TextChoices):
 
 class TransaccionPago(models.Model):
     """Registro detallado de todas las transacciones de pago de los equipos"""
-    equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='transacciones')
-    partido = models.ForeignKey('api.Partido', on_delete=models.CASCADE, related_name='transacciones_pago', blank=True, null=True)
+    equipo = models.ForeignKey(Equipo, on_delete=models.PROTECT, related_name='transacciones')
+    partido = models.ForeignKey('api.Partido', on_delete=models.SET_NULL, related_name='transacciones_pago', blank=True, null=True)
     fecha = models.DateTimeField(auto_now_add=True)
     tipo = models.CharField(max_length=20, choices=TipoTransaccion.choices)
     monto = models.DecimalField(max_digits=8, decimal_places=2, validators=[MinValueValidator(0)])
@@ -36,7 +36,7 @@ class TransaccionPago(models.Model):
     
     # Campos para transacciones específicas
     tarjeta = models.ForeignKey('api.Tarjeta', on_delete=models.SET_NULL, blank=True, null=True)
-    jugador = models.ForeignKey('api.Jugador', on_delete=models.CASCADE, blank=True, null=True)
+    jugador = models.ForeignKey('api.Jugador', on_delete=models.SET_NULL, blank=True, null=True)
     
     # Información adicional
     observaciones = models.TextField(blank=True)

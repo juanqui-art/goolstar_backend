@@ -9,6 +9,7 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 from django.db.models import Sum
 from decimal import Decimal
+from django.db import transaction
 
 from .base import Categoria, Torneo, Nivel
 
@@ -98,12 +99,23 @@ class Equipo(models.Model):
     def get_deuda_multas_pendientes(self):
         """Calcula deuda por multas de tarjetas pendientes de pago"""
         from .competicion import Tarjeta
+        from decimal import Decimal
+        
+        # Verificar si la categoría existe
+        if not self.categoria:
+            return Decimal('0.00')
+            
+        # Verificar si las multas están definidas en la categoría
+        multa_amarilla = getattr(self.categoria, 'multa_amarilla', Decimal('0.00'))
+        multa_roja = getattr(self.categoria, 'multa_roja', Decimal('0.00'))
+        
+        # Contar tarjetas no pagadas
         amarillas = Tarjeta.objects.filter(
             jugador__equipo=self, tipo='AMARILLA', pagada=False).count()
         rojas = Tarjeta.objects.filter(
             jugador__equipo=self, tipo='ROJA', pagada=False).count()
         
-        return (amarillas * self.categoria.multa_amarilla) + (rojas * self.categoria.multa_roja)
+        return (amarillas * multa_amarilla) + (rojas * multa_roja)
     
     def get_tarjetas_no_pagadas(self, tipo=None):
         """Obtiene tarjetas no pagadas del equipo"""
@@ -116,22 +128,27 @@ class Equipo(models.Model):
         return query
     
     def registrar_abono(self, monto, concepto="Abono a inscripción", observaciones=""):
-        """Registra un abono del equipo"""
+        """Registra un abono del equipo de manera atómica"""
         from .financiero import TransaccionPago, TipoTransaccion
         
         # Validar que el monto sea positivo
         if monto <= 0:
             raise ValueError("El monto debe ser mayor que cero")
         
-        # Crear la transacción de pago
-        transaccion = TransaccionPago.objects.create(
-            equipo=self,
-            tipo=TipoTransaccion.ABONO_INSCRIPCION,
-            monto=monto,
-            es_ingreso=True,
-            concepto=concepto,
-            observaciones=observaciones
-        )
+        # Usar transaction.atomic para garantizar que toda la operación sea atómica
+        with transaction.atomic():
+            # Crear la transacción de pago
+            transaccion = TransaccionPago.objects.create(
+                equipo=self,
+                tipo=TipoTransaccion.ABONO_INSCRIPCION,
+                monto=monto,
+                es_ingreso=True,
+                concepto=concepto,
+                observaciones=observaciones
+            )
+            
+            # Si en el futuro necesitas actualizar otros registros relacionados con este abono,
+            # hazlo aquí dentro del contexto de la transacción
         
         return transaccion
     

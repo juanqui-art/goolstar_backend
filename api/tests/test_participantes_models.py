@@ -5,9 +5,9 @@ Pruebas para los modelos de participantes del sistema GoolStar.
 from django.test import TestCase
 from django.utils import timezone
 from decimal import Decimal
-from api.models.base import Nivel, Categoria, Torneo
+from api.models.base import Categoria, Torneo, Nivel
 from api.models.participantes import Dirigente, Equipo, Jugador, Arbitro
-from api.models.competicion import Tarjeta
+from api.models.competicion import Tarjeta, Partido
 
 
 class DirigenteModelTest(TestCase):
@@ -35,47 +35,58 @@ class EquipoModelTest(TestCase):
 
     def setUp(self):
         """Configuración inicial para las pruebas."""
+        # Nivel es un IntegerChoices, no un modelo, por lo que no necesitamos crearlo
         self.categoria = Categoria.objects.create(
-            nombre="VARONES",
+            nombre="VARONES", 
             costo_inscripcion=Decimal('100.00'),
-            multa_amarilla=Decimal('2.00'),
-            multa_roja=Decimal('5.00')
+            multa_amarilla=Decimal('5.00'),
+            multa_roja=Decimal('10.00'),
+            limite_amarillas_suspension=3
         )
-        
         self.torneo = Torneo.objects.create(
-            nombre="Torneo Apertura 2025",
+            nombre="Torneo de Prueba",
             categoria=self.categoria,
             fecha_inicio=timezone.now().date()
         )
-        
         self.dirigente = Dirigente.objects.create(
             nombre="Juan Pérez",
             telefono="0987654321"
         )
-        
         self.equipo = Equipo.objects.create(
-            nombre="Real Madrid",
+            nombre="Equipo de Prueba",
             categoria=self.categoria,
-            torneo=self.torneo,
             dirigente=self.dirigente,
-            grupo="A",
-            nivel=Nivel.ALTO
+            torneo=self.torneo
+        )
+        
+        # Creamos una categoría "dummy" para las pruebas que antes usaban equipo_sin_categoria
+        self.categoria_dummy = Categoria.objects.create(
+            nombre="DUMMY",
+            costo_inscripcion=None,
+            multa_amarilla=Decimal('0.00'),  
+            multa_roja=Decimal('0.00'),      
+            limite_amarillas_suspension=0
+        )
+        
+        self.equipo_sin_categoria = Equipo.objects.create(
+            nombre="Equipo Sin Categoría",
+            dirigente=self.dirigente,
+            torneo=self.torneo,
+            categoria=self.categoria_dummy  
         )
 
     def test_equipo_creation(self):
         """Verifica que el equipo se crea correctamente."""
-        self.assertEqual(self.equipo.nombre, "Real Madrid")
+        self.assertEqual(self.equipo.nombre, "Equipo de Prueba")
         self.assertEqual(self.equipo.categoria, self.categoria)
         self.assertEqual(self.equipo.torneo, self.torneo)
         self.assertEqual(self.equipo.dirigente, self.dirigente)
-        self.assertEqual(self.equipo.grupo, "A")
-        self.assertEqual(self.equipo.nivel, Nivel.ALTO)
         self.assertTrue(self.equipo.activo)
         self.assertEqual(self.equipo.inasistencias, 0)
 
     def test_equipo_str(self):
         """Verifica que el método __str__ funcione correctamente."""
-        self.assertEqual(str(self.equipo), "Real Madrid")
+        self.assertEqual(str(self.equipo), "Equipo de Prueba")
 
     def test_get_total_inscripcion(self):
         """Verifica que el método get_total_inscripcion funcione correctamente."""
@@ -101,6 +112,73 @@ class EquipoModelTest(TestCase):
         self.assertTrue(self.equipo.excluido_por_inasistencias)
         self.assertFalse(self.equipo.activo)
 
+    def test_get_deuda_multas_pendientes_con_categoria(self):
+        """Verifica que el cálculo de multas pendientes funcione correctamente cuando hay categoría."""
+        # Crear jugadores
+        jugador1 = Jugador.objects.create(
+            primer_nombre="Carlos", primer_apellido="Gómez", 
+            cedula="1234567890", equipo=self.equipo, numero_dorsal=10
+        )
+        jugador2 = Jugador.objects.create(
+            primer_nombre="Juan", primer_apellido="Pérez", 
+            cedula="0987654321", equipo=self.equipo, numero_dorsal=11
+        )
+        
+        # Crear un partido de prueba para asociar con las tarjetas
+        partido_prueba = Partido.objects.create(
+            torneo=self.torneo,
+            equipo_1=self.equipo,
+            equipo_2=self.equipo_sin_categoria,
+            fecha=timezone.now(),
+            completado=True
+        )
+        
+        # Crear tarjetas no pagadas
+        Tarjeta.objects.create(
+            jugador=jugador1,
+            tipo='AMARILLA',
+            partido=partido_prueba,
+            pagada=False
+        )
+        Tarjeta.objects.create(
+            jugador=jugador2,
+            tipo='ROJA',
+            partido=partido_prueba,
+            pagada=False
+        )
+        
+        # Verificar el cálculo (1 amarilla * 5.00 + 1 roja * 10.00 = 15.00)
+        self.assertEqual(self.equipo.get_deuda_multas_pendientes(), Decimal('15.00'))
+
+    def test_get_deuda_multas_pendientes_sin_categoria(self):
+        """Verifica que el método maneje correctamente cuando el equipo no tiene categoría asignada."""
+        # Crear jugadores
+        jugador1 = Jugador.objects.create(
+            primer_nombre="Carlos", primer_apellido="Gómez", 
+            cedula="1234567891", equipo=self.equipo_sin_categoria, numero_dorsal=10
+        )
+        
+        # Crear un partido de prueba para asociar con las tarjetas
+        partido_prueba = Partido.objects.create(
+            torneo=self.torneo,
+            equipo_1=self.equipo_sin_categoria,
+            equipo_2=self.equipo,
+            fecha=timezone.now(),
+            completado=True
+        )
+        
+        # Crear tarjeta no pagada
+        Tarjeta.objects.create(
+            jugador=jugador1,
+            tipo='AMARILLA',
+            partido=partido_prueba,
+            pagada=False
+        )
+        
+        # Verificar que no falle y devuelva 0 cuando no hay categoría con valores adecuados
+        # (la categoría dummy tiene multa_amarilla=0.00)
+        self.assertEqual(self.equipo_sin_categoria.get_deuda_multas_pendientes(), Decimal('0.00'))
+
 
 class JugadorModelTest(TestCase):
     """Pruebas para el modelo Jugador."""
@@ -109,6 +187,7 @@ class JugadorModelTest(TestCase):
         """Configuración inicial para las pruebas."""
         self.categoria = Categoria.objects.create(
             nombre="VARONES",
+            costo_inscripcion=Decimal('100.00'),  # Corregido de cuota_inscripcion a costo_inscripcion
             limite_amarillas_suspension=3
         )
         

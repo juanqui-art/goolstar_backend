@@ -18,61 +18,186 @@ class EstadisticaEquipoModelTest(TestCase):
         """Configuración inicial para las pruebas."""
         self.categoria = Categoria.objects.create(nombre="VARONES")
         self.torneo = Torneo.objects.create(nombre="Torneo", categoria=self.categoria, fecha_inicio=timezone.now().date())
-        self.equipo = Equipo.objects.create(nombre="Equipo", categoria=self.categoria, torneo=self.torneo)
         
-        self.estadistica = EstadisticaEquipo.objects.create(
-            equipo=self.equipo,
+        # Crear equipos para las pruebas
+        self.equipo1 = Equipo.objects.create(nombre="Equipo 1", categoria=self.categoria, torneo=self.torneo)
+        self.equipo2 = Equipo.objects.create(nombre="Equipo 2", categoria=self.categoria, torneo=self.torneo)
+        
+        # Crear estadísticas iniciales
+        self.estadistica1 = EstadisticaEquipo.objects.create(
+            equipo=self.equipo1,
             torneo=self.torneo,
-            partidos_jugados=5,
-            partidos_ganados=3,
-            partidos_empatados=1,
-            partidos_perdidos=1,
-            goles_favor=10,
-            goles_contra=5,
-            diferencia_goles=5,
-            puntos=10,
-            tarjetas_amarillas=3,
-            tarjetas_rojas=1
+            partidos_jugados=0,
+            partidos_ganados=0,
+            partidos_empatados=0,
+            partidos_perdidos=0,
+            goles_favor=0,
+            goles_contra=0,
+            puntos=0,
+            diferencia_goles=0,
+            tarjetas_amarillas=0,
+            tarjetas_rojas=0
+        )
+        
+        self.estadistica2 = EstadisticaEquipo.objects.create(
+            equipo=self.equipo2,
+            torneo=self.torneo,
+            partidos_jugados=0,
+            partidos_ganados=0,
+            partidos_empatados=0,
+            partidos_perdidos=0,
+            goles_favor=0,
+            goles_contra=0,
+            puntos=0,
+            diferencia_goles=0,
+            tarjetas_amarillas=0,
+            tarjetas_rojas=0
         )
 
     def test_estadistica_equipo_creation(self):
         """Verifica que la estadística de equipo se crea correctamente."""
-        self.assertEqual(self.estadistica.equipo, self.equipo)
-        self.assertEqual(self.estadistica.torneo, self.torneo)
-        self.assertEqual(self.estadistica.partidos_jugados, 5)
-        self.assertEqual(self.estadistica.partidos_ganados, 3)
-        self.assertEqual(self.estadistica.partidos_empatados, 1)
-        self.assertEqual(self.estadistica.partidos_perdidos, 1)
-        self.assertEqual(self.estadistica.goles_favor, 10)
-        self.assertEqual(self.estadistica.goles_contra, 5)
-        self.assertEqual(self.estadistica.diferencia_goles, 5)
-        self.assertEqual(self.estadistica.puntos, 10)
-        self.assertEqual(self.estadistica.tarjetas_amarillas, 3)
-        self.assertEqual(self.estadistica.tarjetas_rojas, 1)
+        self.assertEqual(self.estadistica1.equipo, self.equipo1)
+        self.assertEqual(self.estadistica1.torneo, self.torneo)
+        self.assertEqual(self.estadistica1.partidos_jugados, 0)
+        self.assertEqual(self.estadistica1.partidos_ganados, 0)
+        self.assertEqual(self.estadistica1.partidos_empatados, 0)
+        self.assertEqual(self.estadistica1.partidos_perdidos, 0)
+        self.assertEqual(self.estadistica1.goles_favor, 0)
+        self.assertEqual(self.estadistica1.goles_contra, 0)
+        self.assertEqual(self.estadistica1.puntos, 0)
+        self.assertEqual(self.estadistica1.diferencia_goles, 0)
+        self.assertEqual(self.estadistica1.tarjetas_amarillas, 0)
+        self.assertEqual(self.estadistica1.tarjetas_rojas, 0)
 
     def test_estadistica_equipo_str(self):
         """Verifica que el método __str__ funcione correctamente."""
-        self.assertEqual(str(self.estadistica), "Estadísticas de Equipo")
+        self.assertEqual(str(self.estadistica1), f"Estadísticas de {self.equipo1.nombre}")
 
     def test_actualizar_estadisticas_sin_partidos(self):
         """Verifica que el método actualizar_estadisticas funcione correctamente sin partidos."""
         # Reiniciar estadísticas
-        self.estadistica.partidos_jugados = 0
-        self.estadistica.partidos_ganados = 0
-        self.estadistica.partidos_empatados = 0
-        self.estadistica.partidos_perdidos = 0
-        self.estadistica.goles_favor = 0
-        self.estadistica.goles_contra = 0
-        self.estadistica.diferencia_goles = 0
-        self.estadistica.puntos = 0
-        self.estadistica.save()
+        self.estadistica1.partidos_jugados = 0
+        self.estadistica1.partidos_ganados = 0
+        self.estadistica1.partidos_empatados = 0
+        self.estadistica1.partidos_perdidos = 0
+        self.estadistica1.goles_favor = 0
+        self.estadistica1.goles_contra = 0
+        self.estadistica1.diferencia_goles = 0
+        self.estadistica1.puntos = 0
+        self.estadistica1.save()
         
         # Actualizar estadísticas (no debería cambiar nada sin partidos)
-        self.estadistica.actualizar_estadisticas()
+        self.estadistica1.actualizar_estadisticas()
         
-        self.assertEqual(self.estadistica.partidos_jugados, 0)
-        self.assertEqual(self.estadistica.partidos_ganados, 0)
-        self.assertEqual(self.estadistica.puntos, 0)
+        self.assertEqual(self.estadistica1.partidos_jugados, 0)
+        self.assertEqual(self.estadistica1.partidos_ganados, 0)
+        self.assertEqual(self.estadistica1.puntos, 0)
+
+    def test_actualizar_estadisticas_optimizado(self):
+        """Verifica que el método optimizado de actualizar_estadisticas funcione correctamente."""
+        # Crear un partido completado donde equipo1 gana
+        partido1 = Partido.objects.create(
+            torneo=self.torneo,
+            equipo_1=self.equipo1,
+            equipo_2=self.equipo2,
+            fecha=timezone.now(),
+            goles_equipo_1=3,
+            goles_equipo_2=1,
+            completado=True
+        )
+        
+        # Llamar al método optimizado
+        self.estadistica1.actualizar_estadisticas()
+        self.estadistica2.actualizar_estadisticas()
+        
+        # Refrescar desde la base de datos
+        self.estadistica1.refresh_from_db()
+        self.estadistica2.refresh_from_db()
+        
+        # Verificar estadísticas del equipo 1 (ganador)
+        self.assertEqual(self.estadistica1.partidos_jugados, 1)
+        self.assertEqual(self.estadistica1.partidos_ganados, 1)
+        self.assertEqual(self.estadistica1.partidos_empatados, 0)
+        self.assertEqual(self.estadistica1.partidos_perdidos, 0)
+        self.assertEqual(self.estadistica1.goles_favor, 3)
+        self.assertEqual(self.estadistica1.goles_contra, 1)
+        self.assertEqual(self.estadistica1.puntos, 3)  # 3 puntos por victoria
+        self.assertEqual(self.estadistica1.diferencia_goles, 2)  # 3 - 1 = 2
+        
+        # Verificar estadísticas del equipo 2 (perdedor)
+        self.assertEqual(self.estadistica2.partidos_jugados, 1)
+        self.assertEqual(self.estadistica2.partidos_ganados, 0)
+        self.assertEqual(self.estadistica2.partidos_empatados, 0)
+        self.assertEqual(self.estadistica2.partidos_perdidos, 1)
+        self.assertEqual(self.estadistica2.goles_favor, 1)
+        self.assertEqual(self.estadistica2.goles_contra, 3)
+        self.assertEqual(self.estadistica2.puntos, 0)  # 0 puntos por derrota
+        self.assertEqual(self.estadistica2.diferencia_goles, -2)  # 1 - 3 = -2
+        
+    def test_actualizar_estadisticas_multiple_partidos(self):
+        """Verifica que las estadísticas se actualicen correctamente con múltiples partidos."""
+        # Crear varios partidos con diferentes resultados
+        
+        # Partido 1: Equipo 1 gana
+        partido1 = Partido.objects.create(
+            torneo=self.torneo,
+            equipo_1=self.equipo1,
+            equipo_2=self.equipo2,
+            fecha=timezone.now() - timedelta(days=10),
+            goles_equipo_1=2,
+            goles_equipo_2=0,
+            completado=True
+        )
+        
+        # Partido 2: Empate
+        partido2 = Partido.objects.create(
+            torneo=self.torneo,
+            equipo_1=self.equipo2,
+            equipo_2=self.equipo1,
+            fecha=timezone.now() - timedelta(days=5),
+            goles_equipo_1=1,
+            goles_equipo_2=1,
+            completado=True
+        )
+        
+        # Partido 3: Equipo 2 gana
+        partido3 = Partido.objects.create(
+            torneo=self.torneo,
+            equipo_1=self.equipo1,
+            equipo_2=self.equipo2,
+            fecha=timezone.now(),
+            goles_equipo_1=0,
+            goles_equipo_2=3,
+            completado=True
+        )
+        
+        # Actualizar estadísticas
+        self.estadistica1.actualizar_estadisticas()
+        self.estadistica2.actualizar_estadisticas()
+        
+        # Refrescar desde la base de datos
+        self.estadistica1.refresh_from_db()
+        self.estadistica2.refresh_from_db()
+        
+        # Verificar estadísticas del equipo 1
+        self.assertEqual(self.estadistica1.partidos_jugados, 3)
+        self.assertEqual(self.estadistica1.partidos_ganados, 1)
+        self.assertEqual(self.estadistica1.partidos_empatados, 1)
+        self.assertEqual(self.estadistica1.partidos_perdidos, 1)
+        self.assertEqual(self.estadistica1.goles_favor, 3)  # 2 + 1 + 0 = 3
+        self.assertEqual(self.estadistica1.goles_contra, 4)  # 0 + 1 + 3 = 4
+        self.assertEqual(self.estadistica1.puntos, 4)  # 3 (victoria) + 1 (empate) = 4
+        self.assertEqual(self.estadistica1.diferencia_goles, -1)  # 3 - 4 = -1
+        
+        # Verificar estadísticas del equipo 2
+        self.assertEqual(self.estadistica2.partidos_jugados, 3)
+        self.assertEqual(self.estadistica2.partidos_ganados, 1)
+        self.assertEqual(self.estadistica2.partidos_empatados, 1)
+        self.assertEqual(self.estadistica2.partidos_perdidos, 1)
+        self.assertEqual(self.estadistica2.goles_favor, 4)  # 0 + 1 + 3 = 4
+        self.assertEqual(self.estadistica2.goles_contra, 3)  # 2 + 1 + 0 = 3
+        self.assertEqual(self.estadistica2.puntos, 4)  # 0 (derrota) + 1 (empate) + 3 (victoria) = 4
+        self.assertEqual(self.estadistica2.diferencia_goles, 1)  # 4 - 3 = 1
 
 
 class LlaveEliminatoriaModelTest(TestCase):
