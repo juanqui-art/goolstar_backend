@@ -125,7 +125,7 @@ class FaseEliminatoria(models.Model):
     completada = models.BooleanField(default=False)
 
     def __str__(self):
-        return f"{self.torneo.nombre} - {self.nombre}"
+        return f"{self.torneo.nombre} - {self.torneo.categoria.nombre} - {self.nombre}"
 
     @property
     def partidos_pendientes(self):

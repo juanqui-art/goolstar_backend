@@ -51,11 +51,6 @@ class TransaccionPago(models.Model):
         super().save(*args, **kwargs)
 
     @property
-    def es_ingreso(self):
-        """Indica si la transacción es un ingreso"""
-        return self.tipo in ['abono_inscripcion', 'multa_amarilla', 'multa_roja']
-    
-    @property
     def es_gasto(self):
         """Indica si la transacción es un gasto"""
         return self.tipo in ['pago_arbitro', 'pago_balon', 'devolucion']

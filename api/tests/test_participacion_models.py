@@ -126,12 +126,14 @@ class ParticipacionJugadorModelTest(TestCase):
         
         # Intentar crear participación con jugador de equipo que no participa
         with self.assertRaises(ValidationError):
-            ParticipacionJugador.objects.create(
+            participacion = ParticipacionJugador(
                 partido=self.partido,
                 jugador=jugador3,
                 es_titular=True,
                 numero_dorsal=11
             )
+            participacion.full_clean()
+            participacion.save()
 
     def test_validacion_jugador_suspendido(self):
         """Verifica que se valide que el jugador no esté suspendido."""
@@ -141,29 +143,33 @@ class ParticipacionJugadorModelTest(TestCase):
         
         # Intentar crear participación con jugador suspendido
         with self.assertRaises(ValidationError):
-            ParticipacionJugador.objects.create(
+            participacion = ParticipacionJugador(
                 partido=self.partido,
                 jugador=self.jugador1,
                 es_titular=True,
                 numero_dorsal=10
             )
+            participacion.full_clean()
+            participacion.save()
 
     def test_validacion_dorsal(self):
         """Verifica que se valide que el número de dorsal coincida con el registrado."""
         # Intentar crear participación con dorsal incorrecto
         with self.assertRaises(ValidationError):
-            ParticipacionJugador.objects.create(
+            participacion = ParticipacionJugador(
                 partido=self.partido,
                 jugador=self.jugador1,
                 es_titular=True,
                 numero_dorsal=99  # Dorsal incorrecto
             )
+            participacion.full_clean()
+            participacion.save()
 
     def test_validacion_minutos(self):
         """Verifica que se valide que los minutos de entrada/salida sean correctos."""
         # Intentar crear participación con minuto de entrada mayor que salida
         with self.assertRaises(ValidationError):
-            ParticipacionJugador.objects.create(
+            participacion = ParticipacionJugador(
                 partido=self.partido,
                 jugador=self.jugador_rival,
                 es_titular=False,
@@ -171,39 +177,47 @@ class ParticipacionJugadorModelTest(TestCase):
                 minuto_entra=70,
                 minuto_sale=60
             )
+            participacion.full_clean()
+            participacion.save()
 
     def test_validacion_titular_sin_minuto_entrada(self):
         """Verifica que se valide que un titular no tenga minuto de entrada."""
         # Intentar crear participación de titular con minuto de entrada
         with self.assertRaises(ValidationError):
-            ParticipacionJugador.objects.create(
+            participacion = ParticipacionJugador(
                 partido=self.partido,
                 jugador=self.jugador_rival,
                 es_titular=True,
                 numero_dorsal=9,
                 minuto_entra=0  # No debería tener minuto de entrada
             )
+            participacion.full_clean()
+            participacion.save()
 
     def test_validacion_suplente_con_minuto_entrada(self):
         """Verifica que se valide que un suplente tenga minuto de entrada."""
         # Intentar crear participación de suplente sin minuto de entrada
         with self.assertRaises(ValidationError):
-            ParticipacionJugador.objects.create(
+            participacion = ParticipacionJugador(
                 partido=self.partido,
                 jugador=self.jugador_rival,
                 es_titular=False,
                 numero_dorsal=9,
                 minuto_entra=None  # Debería tener minuto de entrada
             )
+            participacion.full_clean()
+            participacion.save()
 
     def test_validacion_motivo_salida(self):
         """Verifica que se valide que si hay motivo de salida, haya minuto de salida."""
         # Intentar crear participación con motivo de salida pero sin minuto
         with self.assertRaises(ValidationError):
-            ParticipacionJugador.objects.create(
+            participacion = ParticipacionJugador(
                 partido=self.partido,
                 jugador=self.jugador_rival,
                 es_titular=True,
                 numero_dorsal=9,
                 motivo_salida="lesion"  # Tiene motivo pero no minuto de salida
             )
+            participacion.full_clean()
+            participacion.save()

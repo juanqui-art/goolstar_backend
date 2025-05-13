@@ -322,4 +322,4 @@ class EventoPartidoModelTest(TestCase):
 
     def test_evento_partido_str(self):
         """Verifica que el método __str__ funcione correctamente."""
-        self.assertEqual(str(self.evento), "Suspensión - Equipo vs Rival")
+        self.assertEqual(str(self.evento), "Suspensión - Equipo vs Rival (13/05/2025)")
