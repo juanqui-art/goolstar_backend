@@ -67,8 +67,9 @@ class Equipo(models.Model):
     def deuda_total(self):
         """Calcula la deuda total del equipo usando transacciones"""
         from .financiero import TransaccionPago
-        return self.get_total_inscripcion() - TransaccionPago.objects.filter(
-            equipo=self, tipo='abono_inscripcion').aggregate(total=Sum('monto'))['total'] or 0
+        total_inscripcion = self.get_total_inscripcion()
+        abonos = TransaccionPago.objects.filter(equipo=self, tipo='abono_inscripcion').aggregate(total=Sum('monto'))['total'] or 0
+        return total_inscripcion - abonos
     
     @property
     def calcular_saldo_total(self):
@@ -197,10 +198,10 @@ class Jugador(models.Model):
     segundo_nombre = models.CharField(max_length=100, blank=True, null=True)
     primer_apellido = models.CharField(max_length=100)
     segundo_apellido = models.CharField(max_length=100, blank=True, null=True)
-    cedula = models.CharField(max_length=20)
+    cedula = models.CharField(max_length=20, blank=True, null=True)
     fecha_nacimiento = models.DateField(blank=True, null=True)
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='jugadores')
-    numero_dorsal = models.PositiveSmallIntegerField()
+    numero_dorsal = models.PositiveSmallIntegerField(blank=True, null=True)
     posicion = models.CharField(max_length=50, blank=True)
     nivel = models.IntegerField(choices=Nivel.choices, default=Nivel.MEDIO)
     foto = models.ImageField(upload_to='fotos_jugadores/', blank=True, null=True)
@@ -258,6 +259,18 @@ class Jugador(models.Model):
         unique_together = [
             ['cedula', 'equipo'],
             ['equipo', 'numero_dorsal']
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=['cedula', 'equipo'],
+                name='unique_cedula_equipo',
+                condition=models.Q(cedula__isnull=False)
+            ),
+            models.UniqueConstraint(
+                fields=['equipo', 'numero_dorsal'],
+                name='unique_equipo_dorsal',
+                condition=models.Q(numero_dorsal__isnull=False)
+            )
         ]
         verbose_name = "Jugador"
         verbose_name_plural = "Jugadores"
