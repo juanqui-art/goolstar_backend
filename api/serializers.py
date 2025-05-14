@@ -1,5 +1,7 @@
 from rest_framework import serializers
 from .models import Categoria, Equipo, Jugador, Jornada, Partido, Gol, Tarjeta
+from .models.base import Torneo
+from .models.estadisticas import EstadisticaEquipo
 
 class CategoriaSerializer(serializers.ModelSerializer):
     class Meta:
@@ -75,3 +77,62 @@ class PartidoDetalleSerializer(serializers.ModelSerializer):
     class Meta:
         model = Partido
         fields = '__all__'
+
+# Serializadores para Torneos
+class TorneoSerializer(serializers.ModelSerializer):
+    categoria_nombre = serializers.ReadOnlyField(source='categoria.nombre')
+    total_equipos = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Torneo
+        fields = '__all__'
+    
+    def get_total_equipos(self, obj):
+        return obj.equipos.filter(activo=True).count()
+    
+    def validate(self, data):
+        """Validar que fecha_fin sea posterior a fecha_inicio"""
+        if 'fecha_fin' in data and data.get('fecha_inicio') and data.get('fecha_fin'):
+            if data['fecha_fin'] < data['fecha_inicio']:
+                raise serializers.ValidationError({"fecha_fin": "La fecha de fin debe ser posterior a la fecha de inicio"})
+        return data
+
+class TorneoDetalleSerializer(serializers.ModelSerializer):
+    categoria = CategoriaSerializer(read_only=True)
+    total_equipos = serializers.SerializerMethodField()
+    total_partidos = serializers.SerializerMethodField()
+    partidos_jugados = serializers.SerializerMethodField()
+    partidos_pendientes = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = Torneo
+        fields = '__all__'
+    
+    def get_total_equipos(self, obj):
+        return obj.equipos.filter(activo=True).count()
+    
+    def get_total_partidos(self, obj):
+        return obj.partidos.count()
+    
+    def get_partidos_jugados(self, obj):
+        return obj.partidos.filter(completado=True).count()
+    
+    def get_partidos_pendientes(self, obj):
+        return obj.partidos.filter(completado=False).count()
+
+class EstadisticaEquipoSerializer(serializers.ModelSerializer):
+    equipo_nombre = serializers.ReadOnlyField(source='equipo.nombre')
+    
+    class Meta:
+        model = EstadisticaEquipo
+        fields = [
+            'id', 'equipo', 'equipo_nombre', 'torneo', 
+            'puntos', 'partidos_jugados', 'partidos_ganados', 'partidos_empatados', 'partidos_perdidos',
+            'goles_favor', 'goles_contra', 'diferencia_goles',
+            'tarjetas_amarillas', 'tarjetas_rojas'
+        ]
+        read_only_fields = fields
+
+class TablaposicionesSerializer(serializers.Serializer):
+    grupo = serializers.CharField(max_length=20, required=False)
+    equipos = EstadisticaEquipoSerializer(many=True, read_only=True)
