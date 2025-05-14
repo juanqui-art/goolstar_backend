@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     # Apps instaladas
     'rest_framework',
     'corsheaders',
+    'drf_yasg',  # Para la documentación de la API
     # Apps locales
     'api',
 ]
@@ -153,6 +154,16 @@ MEDIA_ROOT = BASE_DIR / 'media'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+# Configuración de Django REST Framework
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 20,  # 20 elementos por página por defecto
+    'DEFAULT_FILTER_BACKENDS': [
+        'rest_framework.filters.SearchFilter',
+        'rest_framework.filters.OrderingFilter',
+    ],
+}
 
 import sys
 
