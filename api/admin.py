@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.utils.translation import gettext_lazy as _
+from django import forms
 
 # Importaciones de modelos base
 from .models.base import Categoria, Torneo, FaseEliminatoria
@@ -204,8 +205,31 @@ class CambioJugadorInline(admin.TabularInline):
     model = CambioJugador
     extra = 1
 
+class PartidoForm(forms.ModelForm):
+    """Formulario personalizado para el modelo Partido con validación adicional"""
+    class Meta:
+        model = Partido
+        fields = '__all__'
+        
+    def clean(self):
+        cleaned_data = super().clean()
+        equipo_1 = cleaned_data.get('equipo_1')
+        equipo_2 = cleaned_data.get('equipo_2')
+        
+        if not equipo_1:
+            self.add_error('equipo_1', 'Debe seleccionar el primer equipo')
+        
+        if not equipo_2:
+            self.add_error('equipo_2', 'Debe seleccionar el segundo equipo')
+            
+        if equipo_1 and equipo_2 and equipo_1 == equipo_2:
+            self.add_error('equipo_2', 'Debe seleccionar equipos diferentes')
+            
+        return cleaned_data
+
 @admin.register(Partido)
 class PartidoAdmin(admin.ModelAdmin):
+    form = PartidoForm
     list_display = ('__str__', 'jornada', 'fecha', 'goles_equipo_1', 'goles_equipo_2', 'completado')
     list_filter = ('jornada', 'completado', 'equipo_1__categoria', 'torneo', 'equipo_1__grupo')
     search_fields = ('equipo_1__nombre', 'equipo_2__nombre')
@@ -248,14 +272,6 @@ class PartidoAdmin(admin.ModelAdmin):
             grupo = request.GET.get('grupo')
             kwargs["queryset"] = Equipo.objects.filter(grupo=grupo, activo=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
-        
-    def save_model(self, request, obj, form, change):
-        """Agregar validación adicional antes de guardar"""
-        if not obj.equipo_1 or not obj.equipo_2:
-            messages = __import__('django.contrib.messages').messages
-            messages.error(request, "Debes seleccionar ambos equipos para el partido")
-            return
-        super().save_model(request, obj, form, change)
 
 @admin.register(Gol)
 class GolAdmin(admin.ModelAdmin):

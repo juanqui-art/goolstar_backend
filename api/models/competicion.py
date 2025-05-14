@@ -75,9 +75,10 @@ class Partido(models.Model):
             raise ValidationError(
                 "Un partido no puede pertenecer a una jornada y a una fase eliminatoria simultáneamente")
 
-        # Validar que los equipos sean diferentes
-        if self.equipo_1 == self.equipo_2:
-            raise ValidationError("Los equipos deben ser diferentes")
+        # Validar que los equipos sean diferentes, solo si ambos están establecidos
+        if hasattr(self, 'equipo_1') and hasattr(self, 'equipo_2') and self.equipo_1 is not None and self.equipo_2 is not None:
+            if self.equipo_1 == self.equipo_2:
+                raise ValidationError("Los equipos deben ser diferentes")
 
     def __str__(self):
         if self.completado:
