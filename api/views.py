@@ -1,7 +1,7 @@
 from rest_framework import viewsets, filters
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
-from django.db.models import Count, Sum
+from django.db.models import Count, Sum, Q
 from .models import Categoria, Equipo, Jugador, Jornada, Partido, Gol, Tarjeta
 from .models.base import Torneo
 from .models.estadisticas import EstadisticaEquipo
@@ -207,10 +207,12 @@ class PartidoViewSet(viewsets.ModelViewSet):
         
         # Aplicamos filtros adicionales si existen
         if torneo_id:
-            queryset = queryset.filter(jornada__torneo_id=torneo_id)
+            queryset = queryset.filter(torneo_id=torneo_id)
             
         if equipo_id:
-            queryset = queryset.filter(equipo_1_id=equipo_id) | queryset.filter(equipo_2_id=equipo_id)
+            queryset = queryset.filter(
+                Q(equipo_1_id=equipo_id) | Q(equipo_2_id=equipo_id)
+            )
         
         serializer = PartidoDetalleSerializer(queryset, many=True)
         
