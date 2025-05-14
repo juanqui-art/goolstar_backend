@@ -202,8 +202,8 @@ class Jugador(models.Model):
     fecha_nacimiento = models.DateField(blank=True, null=True)
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='jugadores')
     numero_dorsal = models.PositiveSmallIntegerField(blank=True, null=True)
-    posicion = models.CharField(max_length=50, blank=True)
-    nivel = models.IntegerField(choices=Nivel.choices, default=Nivel.MEDIO)
+    posicion = models.CharField(max_length=50, blank=True, null=True)
+    nivel = models.IntegerField(choices=Nivel.choices, default=Nivel.MEDIO, null=True, blank=True)
     foto = models.ImageField(upload_to='fotos_jugadores/', blank=True, null=True)
     
     # Campos para control de suspensiones
