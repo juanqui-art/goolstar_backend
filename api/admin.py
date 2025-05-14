@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 
 # Importaciones de modelos base
 from .models.base import Categoria, Torneo, FaseEliminatoria
@@ -18,63 +19,91 @@ from .models.financiero import TransaccionPago, PagoArbitro
 # Importaciones de modelos de participación
 from .models.participacion import ParticipacionJugador
 
+# Configuración del sitio de administración
+admin.site.site_header = 'GoolStar - Administración de Torneos'
+admin.site.site_title = 'GoolStar Admin'
+admin.site.index_title = 'Panel de administración de torneos'
+
+# -----------------------------------------------------------------------------
+# CONFIGURACIONES BÁSICAS
+# -----------------------------------------------------------------------------
+
 @admin.register(Categoria)
 class CategoriaAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'descripcion', 'costo_inscripcion')
     search_fields = ('nombre',)
+    
+    def get_model_perms(self, request):
+        """Devuelve los permisos para este modelo."""
+        return {'view': True, 'add': True, 'change': True, 'delete': True}
+    
+    def get_fieldsets(self, request, obj=None):
+        fieldsets = [
+            ('Información básica', {
+                'fields': ('nombre', 'descripcion')
+            }),
+            ('Costos', {
+                'fields': ('costo_inscripcion', 'multa_amarilla', 'multa_roja', 'costo_arbitraje')
+            }),
+            ('Premios', {
+                'fields': ('premio_primero', 'premio_segundo', 'premio_tercero', 'premio_cuarto'),
+                'classes': ('collapse',)
+            }),
+            ('Configuración adicional', {
+                'fields': ('limite_inasistencias', 'limite_amarillas_suspension', 'partidos_suspension_roja'),
+                'classes': ('collapse',)
+            }),
+        ]
+        return fieldsets
 
-@admin.register(Equipo)
-class EquipoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'categoria', 'grupo', 'nivel', 'activo')
-    list_filter = ('categoria', 'activo', 'grupo')
-    search_fields = ('nombre',)
+class EquipoInlineTorneo(admin.TabularInline):
+    model = Equipo
+    fields = ('nombre', 'grupo', 'activo')
+    extra = 0
+    can_delete = False
+    show_change_link = True
+    readonly_fields = ('nombre',)
+    
+    def has_add_permission(self, request, obj=None):
+        return False
 
-@admin.register(Jugador)
-class JugadorAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'cedula', 'equipo', 'nivel')
-    list_filter = ('equipo__categoria', 'equipo')
-    search_fields = ('primer_nombre', 'primer_apellido', 'cedula')
-    ordering = ('primer_apellido',)
-    list_per_page = 25
-
-@admin.register(Jornada)
-class JornadaAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'numero', 'fecha')
-    list_filter = ('fecha',)
-
-class GolInline(admin.TabularInline):
-    model = Gol
-    extra = 1
-
-@admin.register(Partido)
-class PartidoAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'jornada', 'fecha', 'goles_equipo_1', 'goles_equipo_2', 'completado')
-    list_filter = ('jornada', 'completado', 'equipo_1__categoria')
-    search_fields = ('equipo_1__nombre', 'equipo_2__nombre')
-    date_hierarchy = 'fecha'
-    ordering = ('-fecha',)
-    list_per_page = 25
-    inlines = [GolInline]
-
-@admin.register(Gol)
-class GolAdmin(admin.ModelAdmin):
-    list_display = ('jugador', 'partido', 'minuto')
-    list_filter = ('partido__jornada', 'jugador__equipo')
-    search_fields = ('jugador__primer_nombre', 'jugador__primer_apellido')
-
-@admin.register(Tarjeta)
-class TarjetaAdmin(admin.ModelAdmin):
-    list_display = ('jugador', 'partido', 'tipo', 'pagada')
-    list_filter = ('tipo', 'pagada', 'jugador__equipo')
-    search_fields = ('jugador__primer_nombre', 'jugador__primer_apellido')
-
+class FaseEliminatoriaInline(admin.TabularInline):
+    model = FaseEliminatoria
+    fields = ('nombre', 'orden', 'fecha_inicio', 'fecha_fin', 'completada')
+    extra = 0
+    show_change_link = True
 
 @admin.register(Torneo)
 class TorneoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'categoria', 'fecha_inicio', 'fase_actual', 'activo', 'finalizado')
     list_filter = ('categoria', 'activo', 'finalizado')
     search_fields = ('nombre',)
-
+    inlines = [EquipoInlineTorneo, FaseEliminatoriaInline]
+    
+    fieldsets = (
+        ('Información básica', {
+            'fields': ('nombre', 'categoria', 'fecha_inicio', 'fecha_fin', 'activo', 'finalizado')
+        }),
+        ('Formato de competición', {
+            'fields': ('tiene_fase_grupos', 'numero_grupos', 'equipos_clasifican_por_grupo', 'tiene_eliminacion_directa')
+        }),
+        ('Estado', {
+            'fields': ('fase_actual',)
+        }),
+    )
+    
+    def equipos_por_grupo(self, obj):
+        """Muestra la cantidad de equipos por grupo"""
+        if not obj.tiene_fase_grupos:
+            return "No aplica"
+        
+        grupos = {}
+        for letra in ['A', 'B', 'C', 'D'][:obj.numero_grupos]:
+            grupos[letra] = obj.equipos.filter(grupo=letra, activo=True).count()
+        
+        return " | ".join([f"Grupo {g}: {c}" for g, c in grupos.items()])
+    
+    equipos_por_grupo.short_description = "Equipos por grupo"
 
 @admin.register(FaseEliminatoria)
 class FaseEliminatoriaAdmin(admin.ModelAdmin):
@@ -82,12 +111,19 @@ class FaseEliminatoriaAdmin(admin.ModelAdmin):
     list_filter = ('torneo', 'completada')
     search_fields = ('nombre',)
 
+@admin.register(Jornada)
+class JornadaAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'numero', 'fecha')
+    list_filter = ('fecha',)
+
+# -----------------------------------------------------------------------------
+# PARTICIPANTES
+# -----------------------------------------------------------------------------
 
 @admin.register(Dirigente)
 class DirigenteAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'telefono')
     search_fields = ('nombre', 'telefono')
-
 
 @admin.register(Arbitro)
 class ArbitroAdmin(admin.ModelAdmin):
@@ -95,58 +131,225 @@ class ArbitroAdmin(admin.ModelAdmin):
     list_filter = ('activo',)
     search_fields = ('nombres', 'apellidos', 'telefono')
 
+class JugadorInline(admin.TabularInline):
+    model = Jugador
+    fields = ('primer_nombre', 'primer_apellido', 'cedula', 'posicion', 'numero_dorsal')
+    extra = 1
+    show_change_link = True
+
+@admin.register(Equipo)
+class EquipoAdmin(admin.ModelAdmin):
+    list_display = ('nombre', 'categoria', 'torneo', 'grupo', 'nivel', 'activo', 'deuda_total')
+    list_filter = ('categoria', 'torneo', 'activo', 'grupo')
+    search_fields = ('nombre',)
+    list_select_related = ('categoria', 'torneo')  # Optimización para evitar N+1 queries
+    inlines = [JugadorInline]
+    
+    fieldsets = (
+        ('Información básica', {
+            'fields': ('nombre', 'categoria', 'torneo', 'dirigente')
+        }),
+        ('Configuración de grupo', {
+            'fields': ('grupo',),
+            'description': 'Asigna el equipo a su grupo correspondiente (A, B, etc.)'
+        }),
+        ('Detalles del equipo', {
+            'fields': ('logo', 'color_principal', 'color_secundario', 'nivel')
+        }),
+        ('Estado', {
+            'fields': ('activo', 'inasistencias', 'excluido_por_inasistencias')
+        }),
+        ('Progreso', {
+            'fields': ('clasificado_fase_grupos', 'fase_actual', 'eliminado_en_fase'),
+            'classes': ('collapse',)
+        }),
+    )
+
+@admin.register(Jugador)
+class JugadorAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'cedula', 'equipo', 'nivel')
+    list_filter = ('equipo__categoria', 'equipo', 'equipo__torneo')
+    search_fields = ('primer_nombre', 'primer_apellido', 'cedula')
+    ordering = ('primer_apellido',)
+    list_per_page = 25
+    list_select_related = ('equipo',)  # Optimización para evitar N+1 queries
+    
+    fieldsets = (
+        ('Datos personales', {
+            'fields': ('primer_nombre', 'segundo_nombre', 'primer_apellido', 
+                      'segundo_apellido', 'cedula', 'fecha_nacimiento')
+        }),
+        ('Información deportiva', {
+            'fields': ('equipo', 'numero_dorsal', 'nivel', 'posicion')
+        }),
+        ('Estado', {
+            'fields': ('suspendido', 'partidos_suspension_restantes', 'fecha_fin_suspension'),
+            'classes': ('collapse',)
+        }),
+    )
+
+# -----------------------------------------------------------------------------
+# PARTIDOS Y EVENTOS
+# -----------------------------------------------------------------------------
+
+class GolInline(admin.TabularInline):
+    model = Gol
+    extra = 1
+
+class TarjetaInline(admin.TabularInline):
+    model = Tarjeta
+    extra = 1
+
+class CambioJugadorInline(admin.TabularInline):
+    model = CambioJugador
+    extra = 1
+
+@admin.register(Partido)
+class PartidoAdmin(admin.ModelAdmin):
+    list_display = ('__str__', 'jornada', 'fecha', 'goles_equipo_1', 'goles_equipo_2', 'completado')
+    list_filter = ('jornada', 'completado', 'equipo_1__categoria', 'torneo', 'equipo_1__grupo')
+    search_fields = ('equipo_1__nombre', 'equipo_2__nombre')
+    date_hierarchy = 'fecha'
+    ordering = ('-fecha',)
+    list_per_page = 25
+    inlines = [GolInline, TarjetaInline, CambioJugadorInline]
+    list_select_related = ('jornada', 'equipo_1', 'equipo_2', 'arbitro')  # Optimización para evitar N+1 queries
+    
+    fieldsets = (
+        ('Información general', {
+            'fields': ('torneo', 'jornada', 'fase_eliminatoria', 'fecha', 'arbitro', 'cancha')
+        }),
+        ('Equipos', {
+            'fields': ('equipo_1', 'equipo_2'),
+            'description': 'Ambos equipos son requeridos para crear un partido'
+        }),
+        ('Resultado', {
+            'fields': ('goles_equipo_1', 'goles_equipo_2', 'completado', 'es_eliminatorio', 
+                      'penales_equipo_1', 'penales_equipo_2')
+        }),
+        ('Control de asistencia', {
+            'fields': ('inasistencia_equipo_1', 'inasistencia_equipo_2', 'equipo_pone_balon')
+        }),
+        ('Acta', {
+            'fields': ('observaciones', 'acta_firmada', 'acta_firmada_equipo_1', 'acta_firmada_equipo_2')
+        }),
+    )
+    
+    def get_queryset(self, request):
+        qs = super().get_queryset(request)
+        return qs.select_related('equipo_1', 'equipo_2', 'jornada', 'torneo', 'arbitro')
+    
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        """Filtra equipos por grupo si se está creando un partido nuevo"""
+        if db_field.name == "equipo_1" and request.GET.get('grupo'):
+            grupo = request.GET.get('grupo')
+            kwargs["queryset"] = Equipo.objects.filter(grupo=grupo, activo=True)
+        if db_field.name == "equipo_2" and request.GET.get('grupo'):
+            grupo = request.GET.get('grupo')
+            kwargs["queryset"] = Equipo.objects.filter(grupo=grupo, activo=True)
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+        
+    def save_model(self, request, obj, form, change):
+        """Agregar validación adicional antes de guardar"""
+        if not obj.equipo_1 or not obj.equipo_2:
+            messages = __import__('django.contrib.messages').messages
+            messages.error(request, "Debes seleccionar ambos equipos para el partido")
+            return
+        super().save_model(request, obj, form, change)
+
+@admin.register(Gol)
+class GolAdmin(admin.ModelAdmin):
+    list_display = ('jugador', 'partido', 'minuto')
+    list_filter = ('partido__jornada', 'jugador__equipo')
+    search_fields = ('jugador__primer_nombre', 'jugador__primer_apellido')
+    list_select_related = ('jugador', 'partido')  # Optimización para evitar N+1 queries
+
+@admin.register(Tarjeta)
+class TarjetaAdmin(admin.ModelAdmin):
+    list_display = ('jugador', 'partido', 'tipo', 'pagada', 'monto_multa')
+    list_filter = ('tipo', 'pagada', 'jugador__equipo')
+    search_fields = ('jugador__primer_nombre', 'jugador__primer_apellido')
+    list_select_related = ('jugador', 'partido')  # Optimización para evitar N+1 queries
+    actions = ['marcar_como_pagadas']
+    
+    def marcar_como_pagadas(self, request, queryset):
+        queryset.update(pagada=True)
+    marcar_como_pagadas.short_description = "Marcar tarjetas seleccionadas como pagadas"
 
 @admin.register(CambioJugador)
 class CambioJugadorAdmin(admin.ModelAdmin):
     list_display = ('partido', 'jugador_sale', 'jugador_entra', 'minuto')
     list_filter = ('partido__jornada',)
     search_fields = ('jugador_sale__primer_apellido', 'jugador_entra__primer_apellido')
-
+    list_select_related = ('partido', 'jugador_sale', 'jugador_entra')  # Optimización para evitar N+1 queries
 
 @admin.register(EventoPartido)
 class EventoPartidoAdmin(admin.ModelAdmin):
     list_display = ('partido', 'tipo', 'minuto', 'equipo_responsable')
     list_filter = ('tipo',)
     search_fields = ('descripcion',)
-
-
-@admin.register(EstadisticaEquipo)
-class EstadisticaEquipoAdmin(admin.ModelAdmin):
-    list_display = ('equipo', 'torneo', 'partidos_jugados', 'partidos_ganados', 'puntos', 'goles_favor', 'goles_contra')
-    list_filter = ('torneo',)
-    search_fields = ('equipo__nombre',)
-
-
-@admin.register(LlaveEliminatoria)
-class LlaveEliminatoriaAdmin(admin.ModelAdmin):
-    list_display = ('fase', 'numero_llave', 'equipo_1', 'equipo_2', 'completada')
-    list_filter = ('fase', 'completada')
-
-
-@admin.register(EventoTorneo)
-class EventoTorneoAdmin(admin.ModelAdmin):
-    list_display = ('torneo', 'tipo', 'fecha', 'equipo_involucrado')
-    list_filter = ('tipo', 'torneo')
-    search_fields = ('descripcion',)
-
-
-@admin.register(TransaccionPago)
-class TransaccionPagoAdmin(admin.ModelAdmin):
-    list_display = ('equipo', 'tipo', 'fecha', 'monto', 'es_ingreso', 'concepto')
-    list_filter = ('tipo',)
-    search_fields = ('equipo__nombre', 'concepto')
-    date_hierarchy = 'fecha'
-
-
-@admin.register(PagoArbitro)
-class PagoArbitroAdmin(admin.ModelAdmin):
-    list_display = ('arbitro', 'partido', 'equipo', 'monto', 'pagado')
-    list_filter = ('pagado',)
-    search_fields = ('arbitro__nombres', 'arbitro__apellidos')
-
+    list_select_related = ('partido', 'equipo_responsable')  # Optimización para evitar N+1 queries
 
 @admin.register(ParticipacionJugador)
 class ParticipacionJugadorAdmin(admin.ModelAdmin):
     list_display = ('jugador', 'partido', 'es_titular', 'numero_dorsal', 'minuto_entra', 'minuto_sale')
     list_filter = ('es_titular', 'partido__jornada')
     search_fields = ('jugador__primer_nombre', 'jugador__primer_apellido')
+    list_select_related = ('jugador', 'partido')  # Optimización para evitar N+1 queries
+
+# -----------------------------------------------------------------------------
+# ESTADÍSTICAS
+# -----------------------------------------------------------------------------
+
+@admin.register(EstadisticaEquipo)
+class EstadisticaEquipoAdmin(admin.ModelAdmin):
+    list_display = ('equipo', 'torneo', 'partidos_jugados', 'partidos_ganados', 'puntos', 'goles_favor', 'goles_contra')
+    list_filter = ('torneo',)
+    search_fields = ('equipo__nombre',)
+    list_select_related = ('equipo', 'torneo')  # Optimización para evitar N+1 queries
+    readonly_fields = ('puntos', 'partidos_jugados', 'partidos_ganados', 'partidos_empatados', 'partidos_perdidos', 
+                       'goles_favor', 'goles_contra', 'diferencia_goles', 'tarjetas_amarillas', 'tarjetas_rojas')
+
+@admin.register(LlaveEliminatoria)
+class LlaveEliminatoriaAdmin(admin.ModelAdmin):
+    list_display = ('fase', 'numero_llave', 'equipo_1', 'equipo_2', 'completada')
+    list_filter = ('fase', 'completada')
+    list_select_related = ('fase', 'equipo_1', 'equipo_2', 'partido')  # Optimización para evitar N+1 queries
+
+@admin.register(MejorPerdedor)
+class MejorPerdedorAdmin(admin.ModelAdmin):
+    list_display = ('equipo', 'torneo', 'grupo', 'puntos', 'diferencia_goles')
+    list_filter = ('torneo', 'grupo')
+    list_select_related = ('equipo', 'torneo')
+
+@admin.register(EventoTorneo)
+class EventoTorneoAdmin(admin.ModelAdmin):
+    list_display = ('torneo', 'tipo', 'fecha', 'equipo_involucrado')
+    list_filter = ('tipo', 'torneo')
+    search_fields = ('descripcion',)
+    list_select_related = ('torneo', 'equipo_involucrado')  # Optimización para evitar N+1 queries
+
+# -----------------------------------------------------------------------------
+# FINANZAS
+# -----------------------------------------------------------------------------
+
+@admin.register(TransaccionPago)
+class TransaccionPagoAdmin(admin.ModelAdmin):
+    list_display = ('equipo', 'tipo', 'fecha', 'monto', 'es_ingreso', 'concepto')
+    list_filter = ('tipo', 'es_ingreso')
+    search_fields = ('equipo__nombre', 'concepto')
+    date_hierarchy = 'fecha'
+    list_select_related = ('equipo', 'partido', 'tarjeta', 'jugador')  # Optimización para evitar N+1 queries
+
+@admin.register(PagoArbitro)
+class PagoArbitroAdmin(admin.ModelAdmin):
+    list_display = ('arbitro', 'partido', 'equipo', 'monto', 'pagado')
+    list_filter = ('pagado',)
+    search_fields = ('arbitro__nombres', 'arbitro__apellidos')
+    list_select_related = ('arbitro', 'partido', 'equipo')  # Optimización para evitar N+1 queries
+    actions = ['marcar_como_pagados']
+    
+    def marcar_como_pagados(self, request, queryset):
+        from django.utils import timezone
+        queryset.update(pagado=True, fecha_pago=timezone.now())
+    marcar_como_pagados.short_description = "Marcar pagos seleccionados como pagados"
