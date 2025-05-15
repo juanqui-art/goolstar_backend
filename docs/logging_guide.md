@@ -12,6 +12,8 @@ El sistema de logging de GoolStar está configurado para:
 3. Rotar archivos de log cuando alcanzan 10MB (con un máximo de 10 copias de respaldo)
 4. Enviar notificaciones por email a los administradores cuando ocurren errores en producción
 5. Mostrar logs detallados en la consola durante el desarrollo
+6. Registrar específicamente problemas relacionados con zonas horarias en timezone.log
+7. Capturar todas las solicitudes HTTP mediante un middleware especializado
 
 ## Niveles de Logging
 
@@ -29,12 +31,12 @@ El sistema de logging de GoolStar está configurado para:
 
 Ejemplo:
 
-[//]: # (```python)
-[//]: # (from api.utils.logging_utils import get_logger)
-[//]: # ()
-[//]: # (# Usar __name__ para identificar automáticamente el módulo actual)
-[//]: # (logger = get_logger(__name__))
-[//]: # (```)
+```python
+from api.utils.logging_utils import get_logger
+
+# Usar __name__ para identificar automáticamente el módulo actual
+logger = get_logger(__name__)
+```
 
 ### 2. Registrar eventos en diferentes niveles
 
@@ -42,20 +44,19 @@ Ejemplos:
 
 ```python
 # Información de depuración (desarrollo)
-# logger.debug("Procesando partido {} con opciones: {}".format(partido_id, opciones))
+logger.debug("Procesando partido {} con opciones: {}".format(partido_id, opciones))
 
 # Operaciones normales
-# logger.info("Partido {} guardado correctamente".format(partido_id))
+logger.info("Partido {} guardado correctamente".format(partido_id))
 
 # Advertencias
-# logger.warning("Fecha {} posiblemente incorrecta".format(fecha))
+logger.warning("Fecha {} posiblemente incorrecta".format(fecha))
 
 # Errores
-# logger.error("Error al procesar partido {}: {}".format(partido_id, str(e)))
+logger.error("Error al procesar partido {}: {}".format(partido_id, str(e)))
 
 # Errores críticos (con stack trace completo)
-
-# (logger.critical&#40;"Fallo en la conexión a la base de datos", exc_info=True&#41;)
+logger.critical("Fallo en la conexión a la base de datos", exc_info=True)
 ```
 
 ### 3. Utilizar decoradores para logging automático
@@ -67,13 +68,14 @@ GoolStar incluye decoradores especiales para funcionalidades comunes:
 Ejemplo:
 
 ```python
-# from api.utils.logging_utils import log_api_request
+from api.utils.logging_utils import get_logger, log_api_request
 
-# @log_api_request(logger)
-# def mi_vista(request):
-#     # Tu código aquí
-#     return Response(...)
+logger = get_logger(__name__)
 
+@log_api_request(logger)
+def mi_vista(request):
+    # Tu código aquí
+    return Response(...)
 ```
 
 Este decorador registra automáticamente:
@@ -87,13 +89,40 @@ Este decorador registra automáticamente:
 Ejemplo:
 
 ```python
-# from api.utils.logging_utils import log_db_operation
+from api.utils.logging_utils import log_db_operation
 
-# @log_db_operation(logger)
-# def actualizar_estadisticas(equipo_id):
-#     # Operaciones de base de datos
-#     pass
+@log_db_operation(logger)
+def actualizar_estadisticas(equipo_id):
+    # Operaciones de base de datos
+    pass
+```
 
+#### Decorador para operaciones con zonas horarias
+
+Ejemplo:
+
+```python
+from api.utils.tz_logging import log_timezone_operation
+
+@log_timezone_operation(logger)
+def procesar_fechas_partidos(fecha_inicio, fecha_fin):
+    # Operaciones con fechas y zonas horarias
+    pass
+```
+
+### 4. Detección de problemas con zonas horarias
+
+GoolStar incluye utilidades específicas para detectar y registrar problemas relacionados con zonas horarias:
+
+```python
+from api.utils.tz_logging import detect_naive_datetime, log_date_conversion
+
+# Detectar fechas sin zona horaria
+if detect_naive_datetime(fecha, logger):
+    # Manejar el problema
+
+# Registrar conversiones de fecha
+log_date_conversion(fecha_original, fecha_convertida, logger)
 ```
 
 ## Archivos de Log
@@ -103,10 +132,69 @@ Los archivos de log se almacenan en el directorio `/logs/` y son:
 - `debug.log` - Todos los mensajes (nivel DEBUG y superior)
 - `info.log` - Mensajes informativos y superiores (INFO, WARNING, ERROR, CRITICAL)
 - `error.log` - Solo mensajes de error (ERROR, CRITICAL)
+- `timezone.log` - Específico para problemas de zona horaria
+
+## Middleware de Logging HTTP
+
+GoolStar incluye un middleware que registra automáticamente todas las solicitudes HTTP:
+
+- Solicitudes entrantes (método, ruta, usuario, dirección IP)
+- Respuestas salientes (código de estado, tiempo de respuesta)
+- Detalles adicionales para errores (códigos 4xx y 5xx)
+
+Este middleware está configurado automáticamente en settings.py y no requiere configuración adicional.
 
 ## Notificaciones por Email
 
 En producción, los errores se envían automáticamente por email a los administradores configurados en la variable `ADMINS` del archivo `.env`.
+
+## Herramientas de Análisis de Logs
+
+GoolStar incluye herramientas para analizar los logs y detectar patrones de errores:
+
+### Log Analyzer
+
+La clase `LogAnalyzer` en `api/utils/log_analyzer.py` permite:
+
+- Analizar archivos de log para detectar patrones
+- Generar reportes de errores
+- Detectar específicamente problemas de zona horaria
+- Generar estadísticas sobre la frecuencia de errores
+
+Ejemplo de uso:
+
+```python
+from api.utils.log_analyzer import LogAnalyzer
+
+# Analizar logs de los últimos 7 días
+analyzer = LogAnalyzer()
+report = analyzer.generate_report(days_back=7)
+
+# Buscar específicamente problemas de zonas horarias
+naive_datetimes = analyzer.detect_naive_datetimes()
+```
+
+También puede usarse desde la línea de comandos:
+
+```bash
+python -m api.utils.log_analyzer --days=7 --output=reporte.json
+```
+
+## Tareas Programadas con Logging
+
+Para las tareas programadas, GoolStar proporciona utilidades en `api/utils/scheduled_tasks.py` que incluyen:
+
+- Actualización de estadísticas con logging integrado
+- Limpieza de logs antiguos
+- Detección de problemas de zona horaria
+
+Ejemplo de uso:
+
+```bash
+python -m api.utils.scheduled_tasks estadisticas
+python -m api.utils.scheduled_tasks limpiar_logs 30
+python -m api.utils.scheduled_tasks check_timezone
+```
 
 ## Mejores prácticas
 
@@ -116,6 +204,8 @@ En producción, los errores se envían automáticamente por email a los administ
 4. **Use el nivel adecuado**: No use ERROR para situaciones normales o esperadas
 5. **Agregue stack traces cuando sea útil**: Use `exc_info=True` para errores importantes
 6. **Contextualice excepciones**: En lugar de solo registrar `str(e)`, añada contexto sobre lo que estaba haciendo
+7. **Utilice los decoradores de logging**: Aproveche `log_api_request`, `log_db_operation` y `log_timezone_operation`
+8. **Preste especial atención a las fechas**: Use siempre las utilidades de `date_utils.py` y registre problemas con `tz_logging.py`
 
 ## Ejemplo completo
 
@@ -127,6 +217,8 @@ from django.core.exceptions import ValidationError
 from rest_framework import viewsets, status
 from rest_framework.response import Response
 from api.utils.logging_utils import get_logger, log_api_request
+from api.utils.date_utils import get_today_date, date_to_datetime
+from api.utils.tz_logging import detect_naive_datetime
 
 # Configurar el logger para el módulo actual
 logger = get_logger(__name__)
@@ -143,6 +235,15 @@ class MiViewSet(viewsets.ModelViewSet):
             # Lógica principal
             serializer = self.get_serializer(data=request.data)
             serializer.is_valid(raise_exception=True)
+            
+            # Verificar fechas
+            fecha = serializer.validated_data.get('fecha')
+            if fecha and detect_naive_datetime(fecha, logger):
+                # Corregir fecha
+                fecha = date_to_datetime(fecha.date())
+                serializer.validated_data['fecha'] = fecha
+                logger.warning("Se corrigió una fecha sin zona horaria")
+            
             self.perform_create(serializer)
             resultado = serializer.instance
             
@@ -173,5 +274,3 @@ class MiViewSet(viewsets.ModelViewSet):
                 {"error": "Se produjo un error inesperado al procesar la solicitud"},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
-
-```

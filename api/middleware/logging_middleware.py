@@ -21,6 +21,8 @@ class RequestLoggingMiddleware(MiddlewareMixin):
     def __init__(self, get_response):
         self.get_response = get_response
         # One-time configuration and initialization
+        # Django 5.2 requires this attribute for middleware compatibility
+        self.async_mode = False
     
     def process_request(self, request):
         """
