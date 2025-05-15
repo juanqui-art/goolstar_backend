@@ -2,12 +2,12 @@
 Tests para los nuevos endpoints de la API: próximos partidos y jugadores destacados.
 """
 
-from datetime import date, timedelta
+from datetime import datetime, timedelta, date
 from django.urls import reverse
 from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
-
+from api.utils.date_utils import get_today_date, date_to_datetime
 from api.models.base import Torneo, Categoria
 from api.models.participantes import Equipo, Jugador
 from api.models.competicion import Partido, Jornada, Gol, Tarjeta
@@ -17,6 +17,27 @@ class ProximosPartidosAPITests(APITestCase):
     """
     Pruebas para el endpoint de próximos partidos.
     """
+    
+    # Función auxiliar para crear fechas con zona horaria
+    def make_aware_date(self, days_delta=0):
+        """
+        Crea una fecha con zona horaria correcta, evitando el problema de 'naive datetimes'.
+        Reemplaza el método anterior que usaba timezone.now().date() directo.
+        
+        Args:
+            days_delta: Número de días a añadir/restar a la fecha actual
+            
+        Returns:
+            Objeto datetime con información de zona horaria (aware)
+        """
+        # Obtenemos la fecha actual como objeto date
+        today_date = get_today_date()
+        
+        # Aplicamos el delta de días
+        target_date = today_date + timedelta(days=days_delta)
+        
+        # Convertimos a datetime aware
+        return date_to_datetime(target_date)
 
     def setUp(self):
         """Configuración inicial para las pruebas."""
@@ -27,13 +48,14 @@ class ProximosPartidosAPITests(APITestCase):
         )
         
         # Fechas para los torneos y partidos
-        self.today = timezone.now().date()
+        self.today = self.make_aware_date()
+        self.today_date = self.today.date()
         
         # Crear un torneo para las pruebas
         self.torneo = Torneo.objects.create(
             nombre='Torneo de Prueba',
             categoria=self.categoria,
-            fecha_inicio=self.today - timedelta(days=10),
+            fecha_inicio=self.make_aware_date(-10).date(),
             activo=True,
             finalizado=False
         )
@@ -73,7 +95,7 @@ class ProximosPartidosAPITests(APITestCase):
             torneo=self.torneo,
             equipo_1=self.equipo1,
             equipo_2=self.equipo2,
-            fecha=self.today - timedelta(days=5),
+            fecha=self.make_aware_date(-5),
             completado=True,
             goles_equipo_1=2,
             goles_equipo_2=1
@@ -85,7 +107,7 @@ class ProximosPartidosAPITests(APITestCase):
             torneo=self.torneo,
             equipo_1=self.equipo2,
             equipo_2=self.equipo3,
-            fecha=self.today,
+            fecha=self.make_aware_date(),
             completado=False
         )
         
@@ -95,7 +117,7 @@ class ProximosPartidosAPITests(APITestCase):
             torneo=self.torneo,
             equipo_1=self.equipo1,
             equipo_2=self.equipo3,
-            fecha=self.today + timedelta(days=3),
+            fecha=self.make_aware_date(3),
             completado=False
         )
         
@@ -105,7 +127,7 @@ class ProximosPartidosAPITests(APITestCase):
             torneo=self.torneo,
             equipo_1=self.equipo3,
             equipo_2=self.equipo1,
-            fecha=self.today + timedelta(days=6),
+            fecha=self.make_aware_date(6),
             completado=False
         )
         
@@ -115,7 +137,7 @@ class ProximosPartidosAPITests(APITestCase):
             torneo=self.torneo,
             equipo_1=self.equipo2,
             equipo_2=self.equipo1,
-            fecha=self.today + timedelta(days=10),
+            fecha=self.make_aware_date(10),
             completado=False
         )
 
@@ -194,9 +216,30 @@ class ProximosPartidosAPITests(APITestCase):
 
 class JugadoresDestacadosAPITests(APITestCase):
     """
-    Pruebas para el endpoint de jugadores destacados.
+    Pruebas para el endpoint de jugadores destacados por torneo.
     """
-
+    
+    # Función auxiliar para crear fechas con zona horaria
+    def make_aware_date(self, days_delta=0):
+        """
+        Crea una fecha con zona horaria correcta, evitando el problema de 'naive datetimes'.
+        Reemplaza el método anterior que usaba timezone.now().date() directo.
+        
+        Args:
+            days_delta: Número de días a añadir/restar a la fecha actual
+            
+        Returns:
+            Objeto datetime con información de zona horaria (aware)
+        """
+        # Obtenemos la fecha actual como objeto date
+        today_date = get_today_date()
+        
+        # Aplicamos el delta de días
+        target_date = today_date + timedelta(days=days_delta)
+        
+        # Convertimos a datetime aware
+        return date_to_datetime(target_date)
+    
     def setUp(self):
         """Configuración inicial para las pruebas."""
         # Crear categoría para las pruebas
@@ -206,13 +249,14 @@ class JugadoresDestacadosAPITests(APITestCase):
         )
         
         # Fechas para los torneos y partidos
-        self.today = timezone.now().date()
+        self.today = self.make_aware_date()
+        self.today_date = self.today.date()
         
         # Crear un torneo para las pruebas
         self.torneo = Torneo.objects.create(
             nombre='Torneo de Prueba',
             categoria=self.categoria,
-            fecha_inicio=self.today - timedelta(days=30),
+            fecha_inicio=self.make_aware_date(-30).date(),
             activo=True,
             finalizado=False
         )
@@ -244,7 +288,7 @@ class JugadoresDestacadosAPITests(APITestCase):
             torneo=self.torneo,
             equipo_1=self.equipo1,
             equipo_2=self.equipo2,
-            fecha=self.today - timedelta(days=15),
+            fecha=self.make_aware_date(-15),
             completado=True,
             goles_equipo_1=3,
             goles_equipo_2=1
@@ -385,7 +429,7 @@ class JugadoresDestacadosAPITests(APITestCase):
         torneo_vacio = Torneo.objects.create(
             nombre='Torneo Vacío',
             categoria=self.categoria,
-            fecha_inicio=self.today,
+            fecha_inicio=self.make_aware_date().date(),
             activo=True,
             finalizado=False
         )
