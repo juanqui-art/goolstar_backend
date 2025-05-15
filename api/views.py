@@ -15,6 +15,8 @@ from .serializers import (
 )
 
 from api.utils.logging_utils import get_logger, log_api_request
+from api.utils.date_utils import get_today_date, date_to_datetime
+from api.utils.tz_logging import log_timezone_operation, detect_naive_datetime, log_date_conversion
 
 logger = get_logger(__name__)
 
@@ -49,6 +51,31 @@ class EquipoViewSet(viewsets.ModelViewSet):
             return EquipoDetalleSerializer
         return EquipoSerializer
     
+    @log_api_request(logger)
+    def list(self, request, *args, **kwargs):
+        """Lista todos los equipos (con logging)"""
+        logger.info(f"Listando equipos - Usuario: {request.user}")
+        return super().list(request, *args, **kwargs)
+    
+    @log_api_request(logger)
+    def retrieve(self, request, *args, **kwargs):
+        """Obtiene un equipo específico (con logging)"""
+        logger.info(f"Obteniendo detalle del equipo {kwargs.get('pk')} - Usuario: {request.user}")
+        return super().retrieve(request, *args, **kwargs)
+    
+    @log_api_request(logger)
+    def create(self, request, *args, **kwargs):
+        """Crea un nuevo equipo (con logging)"""
+        logger.info(f"Creando nuevo equipo - Usuario: {request.user}")
+        return super().create(request, *args, **kwargs)
+    
+    @log_api_request(logger)
+    def update(self, request, *args, **kwargs):
+        """Actualiza un equipo (con logging)"""
+        logger.info(f"Actualizando equipo {kwargs.get('pk')} - Usuario: {request.user}")
+        return super().update(request, *args, **kwargs)
+    
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def por_categoria(self, request):
         """
@@ -61,11 +88,17 @@ class EquipoViewSet(viewsets.ModelViewSet):
         - Lista de equipos que pertenecen a la categoría especificada
         """
         categoria_id = request.query_params.get('categoria_id')
-        if categoria_id:
-            equipos = Equipo.objects.filter(categoria_id=categoria_id)
-            serializer = self.get_serializer(equipos, many=True)
-            return Response(serializer.data)
-        return Response({"error": "Se requiere el parámetro categoria_id"}, status=400)
+        logger.info(f"Buscando equipos para la categoría ID: {categoria_id} - Usuario: {request.user}")
+        
+        if not categoria_id:
+            logger.warning(f"Solicitud de equipos sin especificar categoria_id - Usuario: {request.user}")
+            return Response({"error": "Debe especificar el parámetro categoria_id"}, status=400)
+        
+        equipos = Equipo.objects.filter(categoria_id=categoria_id)
+        serializer = self.get_serializer(equipos, many=True)
+        
+        logger.info(f"Equipos encontrados para categoría ID {categoria_id}: {equipos.count()}")
+        return Response(serializer.data)
 
 class JugadorViewSet(viewsets.ModelViewSet):
     """
@@ -79,7 +112,20 @@ class JugadorViewSet(viewsets.ModelViewSet):
     search_fields = ['primer_nombre', 'primer_apellido', 'cedula']
     ordering_fields = ['primer_apellido', 'primer_nombre']
     permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @log_api_request(logger)
+    def list(self, request, *args, **kwargs):
+        """Lista todos los jugadores (con logging)"""
+        logger.info(f"Listando jugadores - Usuario: {request.user}")
+        return super().list(request, *args, **kwargs)
     
+    @log_api_request(logger)
+    def retrieve(self, request, *args, **kwargs):
+        """Obtiene un jugador específico (con logging)"""
+        logger.info(f"Obteniendo detalle del jugador {kwargs.get('pk')} - Usuario: {request.user}")
+        return super().retrieve(request, *args, **kwargs)
+
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def por_equipo(self, request):
         """
@@ -92,12 +138,19 @@ class JugadorViewSet(viewsets.ModelViewSet):
         - Lista de jugadores que pertenecen al equipo especificado
         """
         equipo_id = request.query_params.get('equipo_id')
-        if equipo_id:
-            jugadores = Jugador.objects.filter(equipo_id=equipo_id)
-            serializer = self.get_serializer(jugadores, many=True)
-            return Response(serializer.data)
-        return Response({"error": "Se requiere el parámetro equipo_id"}, status=400)
-    
+        logger.info(f"Buscando jugadores para el equipo ID: {equipo_id} - Usuario: {request.user}")
+        
+        if not equipo_id:
+            logger.warning(f"Solicitud de jugadores sin especificar equipo_id - Usuario: {request.user}")
+            return Response({"error": "Debe especificar el parámetro equipo_id"}, status=400)
+        
+        queryset = Jugador.objects.filter(equipo__id=equipo_id).select_related('equipo')
+        serializer = self.get_serializer(queryset, many=True)
+        
+        logger.info(f"Jugadores encontrados para equipo ID {equipo_id}: {queryset.count()}")
+        return Response(serializer.data)
+
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def goleadores(self, request):
         """
@@ -106,12 +159,20 @@ class JugadorViewSet(viewsets.ModelViewSet):
         Retorna:
         - Lista de jugadores ordenados por la cantidad de goles marcados (descendente)
         """
-        jugadores = Jugador.objects.annotate(total_goles=Count('goles')).filter(total_goles__gt=0).order_by('-total_goles')
-        serializer = JugadorSerializer(jugadores, many=True)
-        data = serializer.data
-        for i, jugador in enumerate(data):
-            jugador['total_goles'] = jugadores[i].total_goles
-        return Response(data)
+        logger.info(f"Generando listado de goleadores - Usuario: {request.user}")
+        
+        # Fecha actual (usando utilidad de zona horaria)
+        today = get_today_date()
+        logger.debug(f"Fecha actual para filtro de goleadores: {today}")
+        
+        queryset = Jugador.objects.annotate(
+            total_goles=Count('gol')
+        ).filter(total_goles__gt=0).order_by('-total_goles', 'primer_apellido')
+        
+        serializer = self.get_serializer(queryset, many=True)
+        logger.info(f"Total de goleadores encontrados: {queryset.count()}")
+        
+        return Response(serializer.data)
 
 class JornadaViewSet(viewsets.ModelViewSet):
     """
@@ -123,6 +184,19 @@ class JornadaViewSet(viewsets.ModelViewSet):
     serializer_class = JornadaSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
 
+    @log_api_request(logger)
+    def list(self, request, *args, **kwargs):
+        """Lista todas las jornadas (con logging)"""
+        logger.info(f"Listando jornadas - Usuario: {request.user}")
+        return super().list(request, *args, **kwargs)
+    
+    @log_api_request(logger)
+    def retrieve(self, request, *args, **kwargs):
+        """Obtiene una jornada específica (con logging)"""
+        logger.info(f"Obteniendo detalle de la jornada {kwargs.get('pk')} - Usuario: {request.user}")
+        return super().retrieve(request, *args, **kwargs)
+
+    @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def partidos(self, request, pk=None):
         """
@@ -131,9 +205,21 @@ class JornadaViewSet(viewsets.ModelViewSet):
         Retorna:
         - Lista de partidos de la jornada ordenados por fecha.
         """
+        logger.info(f"Buscando partidos para la jornada ID: {pk} - Usuario: {request.user}")
+        
         jornada = self.get_object()
-        partidos = jornada.partidos.all().select_related('equipo_1', 'equipo_2', 'torneo', 'jornada').order_by('fecha')
-        serializer = PartidoDetalleSerializer(partidos, many=True)
+        partidos = Partido.objects.filter(jornada=jornada).select_related(
+            'equipo_1', 'equipo_2', 'jornada', 'torneo'
+        ).order_by('fecha')
+        
+        # Verificar integridad de fechas
+        for partido in partidos:
+            # Detectar fechas sin zona horaria
+            detect_naive_datetime(partido.fecha, logger)
+        
+        serializer = PartidoSerializer(partidos, many=True)
+        logger.info(f"Partidos encontrados para jornada {pk}: {partidos.count()}")
+        
         return Response(serializer.data)
 
 class PartidoViewSet(viewsets.ModelViewSet):
@@ -180,7 +266,9 @@ class PartidoViewSet(viewsets.ModelViewSet):
         - Lista de partidos de la jornada especificada ordenados por fecha
         """
         jornada_id = request.query_params.get('jornada_id')
-        logger.info(f"Filtrando partidos por jornada: {jornada_id}")
+        logger.info(
+            f"Filtrando partidos por jornada: {jornada_id}"
+        )
         
         if jornada_id:
             try:
@@ -316,7 +404,20 @@ class GolViewSet(viewsets.ModelViewSet):
     queryset = Gol.objects.all().select_related('jugador', 'partido')
     serializer_class = GolSerializer
     permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @log_api_request(logger)
+    def list(self, request, *args, **kwargs):
+        """Lista todos los goles (con logging)"""
+        logger.info(f"Listando goles - Usuario: {request.user}")
+        return super().list(request, *args, **kwargs)
     
+    @log_api_request(logger)
+    def retrieve(self, request, *args, **kwargs):
+        """Obtiene un gol específico (con logging)"""
+        logger.info(f"Obteniendo detalle del gol {kwargs.get('pk')} - Usuario: {request.user}")
+        return super().retrieve(request, *args, **kwargs)
+
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def por_partido(self, request):
         """
@@ -329,11 +430,17 @@ class GolViewSet(viewsets.ModelViewSet):
         - Lista de goles marcados en el partido especificado
         """
         partido_id = request.query_params.get('partido_id')
-        if partido_id:
-            goles = Gol.objects.filter(partido_id=partido_id)
-            serializer = self.get_serializer(goles, many=True)
-            return Response(serializer.data)
-        return Response({"error": "Se requiere el parámetro partido_id"}, status=400)
+        logger.info(f"Buscando goles para el partido ID: {partido_id} - Usuario: {request.user}")
+        
+        if not partido_id:
+            logger.warning(f"Solicitud de goles sin especificar partido_id - Usuario: {request.user}")
+            return Response({"error": "Debe especificar el parámetro partido_id"}, status=400)
+        
+        queryset = Gol.objects.filter(partido__id=partido_id).select_related('jugador', 'partido')
+        serializer = self.get_serializer(queryset, many=True)
+        
+        logger.info(f"Goles encontrados para partido ID {partido_id}: {queryset.count()}")
+        return Response(serializer.data)
 
 class TarjetaViewSet(viewsets.ModelViewSet):
     """
@@ -347,6 +454,19 @@ class TarjetaViewSet(viewsets.ModelViewSet):
     search_fields = ['jugador__primer_nombre', 'jugador__primer_apellido']
     permission_classes = [IsAuthenticatedOrReadOnly]
     
+    @log_api_request(logger)
+    def list(self, request, *args, **kwargs):
+        """Lista todas las tarjetas (con logging)"""
+        logger.info(f"Listando tarjetas - Usuario: {request.user}")
+        return super().list(request, *args, **kwargs)
+    
+    @log_api_request(logger)
+    def retrieve(self, request, *args, **kwargs):
+        """Obtiene una tarjeta específica (con logging)"""
+        logger.info(f"Obteniendo detalle de la tarjeta {kwargs.get('pk')} - Usuario: {request.user}")
+        return super().retrieve(request, *args, **kwargs)
+
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def por_tipo(self, request):
         """
@@ -358,12 +478,18 @@ class TarjetaViewSet(viewsets.ModelViewSet):
         Retorna:
         - Lista de tarjetas del tipo especificado
         """
-        tipo = request.query_params.get('tipo')
-        if tipo:
-            tarjetas = Tarjeta.objects.filter(tipo=tipo.upper())
-            serializer = self.get_serializer(tarjetas, many=True)
-            return Response(serializer.data)
-        return Response({"error": "Se requiere el parámetro tipo (AMARILLA o ROJA)"}, status=400)
+        tipo = request.query_params.get('tipo', '').upper()
+        logger.info(f"Buscando tarjetas de tipo: {tipo} - Usuario: {request.user}")
+        
+        if tipo not in ['AMARILLA', 'ROJA']:
+            logger.warning(f"Tipo de tarjeta inválido: {tipo} - Usuario: {request.user}")
+            return Response({"error": "El tipo debe ser 'AMARILLA' o 'ROJA'"}, status=400)
+        
+        queryset = Tarjeta.objects.filter(tipo=tipo).select_related('jugador', 'partido')
+        serializer = self.get_serializer(queryset, many=True)
+        
+        logger.info(f"Tarjetas encontradas de tipo {tipo}: {queryset.count()}")
+        return Response(serializer.data)
 
 class TorneoViewSet(viewsets.ModelViewSet):
     """
@@ -377,12 +503,25 @@ class TorneoViewSet(viewsets.ModelViewSet):
     search_fields = ['nombre', 'categoria__nombre']
     ordering_fields = ['nombre', 'fecha_inicio', 'categoria']
     permission_classes = [IsAuthenticatedOrReadOnly]
-    
+
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return TorneoDetalleSerializer
         return TorneoSerializer
     
+    @log_api_request(logger)
+    def list(self, request, *args, **kwargs):
+        """Lista todos los torneos (con logging)"""
+        logger.info(f"Listando torneos - Usuario: {request.user}")
+        return super().list(request, *args, **kwargs)
+    
+    @log_api_request(logger)
+    def retrieve(self, request, *args, **kwargs):
+        """Obtiene un torneo específico (con logging)"""
+        logger.info(f"Obteniendo detalle del torneo {kwargs.get('pk')} - Usuario: {request.user}")
+        return super().retrieve(request, *args, **kwargs)
+
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def activos(self, request):
         """
@@ -391,14 +530,27 @@ class TorneoViewSet(viewsets.ModelViewSet):
         Retorna:
         - Lista de torneos que están actualmente en curso, ordenados por fecha de inicio.
         """
-        torneos_activos = Torneo.objects.filter(
-            activo=True, 
-            finalizado=False
-        ).select_related('categoria').order_by('-fecha_inicio')
+        logger.info(f"Buscando torneos activos - Usuario: {request.user}")
         
-        serializer = self.get_serializer(torneos_activos, many=True)
+        # Fecha actual (usando utilidad de zona horaria)
+        today = get_today_date()
+        logger.debug(f"Fecha actual para filtro de torneos activos: {today}")
+        
+        # Convertir date a datetime para el filtrado
+        today_datetime = date_to_datetime(today)
+        log_date_conversion(today, today_datetime, logger)
+        
+        queryset = Torneo.objects.filter(
+            fecha_inicio__lte=today_datetime,
+            fecha_fin__gte=today_datetime
+        ).select_related('categoria').order_by('fecha_inicio')
+        
+        serializer = self.get_serializer(queryset, many=True)
+        logger.info(f"Torneos activos encontrados: {queryset.count()}")
+        
         return Response(serializer.data)
     
+    @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def tabla_posiciones(self, request, pk=None):
         """
@@ -432,6 +584,7 @@ class TorneoViewSet(viewsets.ModelViewSet):
         }
         return Response(response_data)
     
+    @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def estadisticas(self, request, pk=None):
         """
@@ -486,6 +639,7 @@ class TorneoViewSet(viewsets.ModelViewSet):
         
         return Response(response_data)
         
+    @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def jugadores_destacados(self, request, pk=None):
         """
