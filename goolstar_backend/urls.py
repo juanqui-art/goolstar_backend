@@ -18,6 +18,8 @@ from django.contrib import admin
 from django.urls import path, include, re_path
 from django.conf import settings
 from django.conf.urls.static import static
+from django.views.generic import RedirectView
+from django.http import HttpResponse
 
 # Imports para drf-yasg (Swagger)
 from rest_framework import permissions
@@ -29,16 +31,33 @@ schema_view = get_schema_view(
     openapi.Info(
         title="GoolStar API",
         default_version='v1',
-        description="API para el sistema de gestión de torneos de fútbol GoolStar",
-        terms_of_service="https://www.google.com/policies/terms/",
-        contact=openapi.Contact(email="contact@goolstar.local"),
+        description="API para gestión de competiciones deportivas",
+        terms_of_service="https://www.goolstar.com/terms/",
+        contact=openapi.Contact(email="contact@goolstar.com"),
         license=openapi.License(name="BSD License"),
     ),
     public=True,
     permission_classes=(permissions.AllowAny,),
 )
 
+# Vista simple para health checks
+def health_check(request):
+    return HttpResponse("OK", content_type="text/plain")
+
+# Vista simple para página principal (raíz)
+def home(request):
+    return HttpResponse(
+        "<html><body><h1>GoolStar API</h1>"
+        "<p>¡Bienvenido a la API de GoolStar!</p>"
+        "<p>La documentación de la API está disponible en "
+        "<a href='/swagger/'>Swagger</a> o <a href='/redoc/'>ReDoc</a>.</p>"
+        "</body></html>",
+        content_type="text/html"
+    )
+
 urlpatterns = [
+    # Cambio: Usar una vista simple para la raíz en lugar de redirección
+    path('', home, name='home'),
     path('admin/', admin.site.urls),
     path('api/', include('api.urls')),
     
@@ -46,6 +65,9 @@ urlpatterns = [
     re_path(r'^swagger(?P<format>\.json|\.yaml)$', schema_view.without_ui(cache_timeout=0), name='schema-json'),
     path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='schema-swagger-ui'),
     path('redoc/', schema_view.with_ui('redoc', cache_timeout=0), name='schema-redoc'),
+    
+    # Health check endpoint para Fly.io
+    path('health/', health_check, name='health_check'),
 ]
 
 # Configuración para servir archivos multimedia durante el desarrollo
