@@ -24,10 +24,23 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 import os
-SECRET_KEY = os.environ.get('SECRET_KEY', 'django-insecure-t03zw!p1mo32-9&d_z&%&fltgm!=td5qn$4piq%n!+zj&tbx%$')
+SECRET_KEY = os.environ.get('SECRET_KEY')
+if SECRET_KEY is None:
+    if os.environ.get('PRODUCTION', 'False') == 'True':
+        raise ValueError(
+            "ERROR: No SECRET_KEY definida en variables de entorno. "
+            "Esto es obligatorio para entornos de producción."
+        )
+    else:
+        # Solo para desarrollo, nunca debe usarse en producción
+        SECRET_KEY = 'django-insecure-t03zw!p1mo32-9&d_z&%&fltgm!=td5qn$4piq%n!+zj&tbx%$'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+# Por defecto, DEBUG es False en producción
+DEBUG = False
+if os.environ.get('PRODUCTION', 'False') != 'True':
+    # Solo habilitar DEBUG si estamos en desarrollo y se especifica explícitamente
+    DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.fly.dev']
 
@@ -42,8 +55,11 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     # Apps instaladas
     'rest_framework',
+    'rest_framework.authtoken',  # Para autenticación basada en tokens
     'corsheaders',
     'drf_yasg',  # Para la documentación de la API
+    'rest_framework_simplejwt',  # Para autenticación con JWT
+    'rest_framework_simplejwt.token_blacklist',  # Añadido para permitir blacklist de tokens
     # Apps locales
     'api',
 ]
@@ -150,12 +166,119 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
+# Configuración de Logging
+LOGS_DIR = BASE_DIR / 'logs'
+
+# Configuración de logging para desarrollo y producción
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{asctime} [{levelname}] {name} {filename}:{lineno:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'filters': {
+        'require_debug_true': {
+            '()': 'django.utils.log.RequireDebugTrue',
+        },
+        'require_debug_false': {
+            '()': 'django.utils.log.RequireDebugFalse',
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'filters': ['require_debug_true'],
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file_debug': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'debug.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+        },
+        'file_info': {
+            'level': 'INFO',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'info.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+        },
+        'file_error': {
+            'level': 'ERROR',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'error.log',
+            'maxBytes': 10 * 1024 * 1024,  # 10 MB
+            'backupCount': 10,
+            'formatter': 'verbose',
+        },
+        'mail_admins': {
+            'level': 'ERROR',
+            'filters': ['require_debug_false'],
+            'class': 'django.utils.log.AdminEmailHandler',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file_info', 'mail_admins'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'django.server': {
+            'handlers': ['console', 'file_info'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'django.request': {
+            'handlers': ['file_error', 'mail_admins'],
+            'level': 'ERROR',
+            'propagate': False,
+        },
+        'django.db.backends': {
+            'handlers': ['file_debug'] if DEBUG else [],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        # Loggers personalizados para nuestra aplicación
+        'api': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        'goolstar_backend': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+    },
+}
+
+# Añadir a .env.example
+# EMAIL_HOST=smtp.example.com
+# EMAIL_PORT=587
+# EMAIL_HOST_USER=your_email@example.com
+# EMAIL_HOST_PASSWORD=your_password
+# EMAIL_USE_TLS=True
+# DEFAULT_FROM_EMAIL=your_email@example.com
+# ADMINS=[('Admin Name', 'admin@example.com')]
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Configuración de Django REST Framework
+# Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20,  # 20 elementos por página por defecto
@@ -163,6 +286,27 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ],
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+        'rest_framework.authentication.BasicAuthentication',
+    ],
+}
+
+# Simple JWT settings
+from datetime import timedelta
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # Token de acceso válido por 1 hora
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # Token de refresco válido por 7 días
+    'ROTATE_REFRESH_TOKENS': True,  # Genera un nuevo refresh token cuando se usa
+    'BLACKLIST_AFTER_ROTATION': True,  # Agregado para permitir blacklist de tokens
+    
+    'ALGORITHM': 'HS256',  # Algoritmo de firma (HMAC con SHA-256)
+    'SIGNING_KEY': SECRET_KEY,  # Usa la clave secreta de Django para firmar
+    'VERIFYING_KEY': None,
+    'AUTH_HEADER_TYPES': ('Bearer',),  # Tipo de cabecera de autenticación (Bearer token)
+    'USER_ID_FIELD': 'id',  # Campo que identifica al usuario
+    'USER_ID_CLAIM': 'user_id',  # Nombre del claim en el token
 }
 
 import sys
