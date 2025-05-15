@@ -22,8 +22,10 @@ var/
 .installed.cfg
 *.egg
 
-# Archivos de entorno virtual
+# Archivos de entorno (excepto el ejemplo)
 .env
+.env[^.]*
+!.env.example
 .venv
 env/
 venv/
@@ -41,6 +43,7 @@ venv.bak/
 *.log
 local_settings.py
 db.sqlite3
+db_local.sqlite3
 media/
 staticfiles/
 static/
