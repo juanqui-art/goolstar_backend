@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
+from django.contrib.auth.models import User
 
 from api.models.base import Torneo, Categoria
 from api.models.participantes import Equipo
@@ -18,6 +19,15 @@ class TorneoAPIEdgeCaseTests(APITestCase):
 
     def setUp(self):
         """Configuración inicial para las pruebas."""
+        # Crear un usuario para autenticación
+        self.user = User.objects.create_user(
+            username='testuser', 
+            password='testpassword',
+            is_staff=True
+        )
+        # Autenticar al cliente para las pruebas
+        self.client.force_authenticate(user=self.user)
+        
         # Crear categoría para las pruebas
         self.categoria = Categoria.objects.create(
             nombre='Varones', 

@@ -5,10 +5,11 @@ Pruebas para los modelos de competición del sistema GoolStar.
 from django.test import TestCase
 from django.utils import timezone
 from django.core.exceptions import ValidationError
-from datetime import timedelta
+from datetime import timedelta, date
 from api.models.base import Categoria, Torneo
 from api.models.participantes import Equipo, Jugador, Arbitro
 from api.models.competicion import Jornada, Partido, Gol, Tarjeta, CambioJugador, EventoPartido
+from api.utils.date_utils import date_to_datetime  # Importar utilidad para fechas con zona horaria
 
 
 class JornadaModelTest(TestCase):
@@ -295,13 +296,22 @@ class EventoPartidoModelTest(TestCase):
 
     def setUp(self):
         """Configuración inicial para las pruebas."""
-        self.categoria = Categoria.objects.create(nombre="VARONES")
-        self.torneo = Torneo.objects.create(nombre="Torneo", categoria=self.categoria, fecha_inicio=timezone.now().date())
+        self.categoria = Categoria.objects.create(nombre="Categoría Test")
+        # Añadir fecha_inicio al crear el torneo
+        self.torneo = Torneo.objects.create(
+            nombre="Torneo Test", 
+            categoria=self.categoria,
+            fecha_inicio=date(2025, 5, 13)
+        )
+        
         self.equipo = Equipo.objects.create(nombre="Equipo", categoria=self.categoria, torneo=self.torneo)
+        
+        # Usar una fecha fija para el test en lugar de timezone.now()
+        test_date = date_to_datetime(date(2025, 5, 13))
         self.partido = Partido.objects.create(
             torneo=self.torneo, equipo_1=self.equipo, 
             equipo_2=Equipo.objects.create(nombre="Rival", categoria=self.categoria, torneo=self.torneo),
-            fecha=timezone.now()
+            fecha=test_date
         )
         
         self.evento = EventoPartido.objects.create(
