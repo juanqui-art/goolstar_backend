@@ -6,6 +6,8 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 ENV DEBUG=False
+# Asegurarnos de que Fly.io reconozca esta variable
+ENV PORT=8000
 
 # Instalar dependencias
 COPY requirements.txt .
@@ -17,7 +19,8 @@ COPY . .
 # Recolectar archivos estáticos
 RUN python manage.py collectstatic --noinput
 
-# Ejecutar migraciones y servidor
-CMD ["sh", "-c", "python manage.py migrate && gunicorn goolstar_backend.wsgi:application --bind 0.0.0.0:8000"]
+# Exponer el puerto - esto es muy importante para Fly.io
+EXPOSE ${PORT}
 
-EXPOSE 8000
+# Ejecutar migraciones y servidor
+CMD ["sh", "-c", "python manage.py migrate && gunicorn goolstar_backend.wsgi:application --bind 0.0.0.0:${PORT}"]
