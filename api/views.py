@@ -2,6 +2,7 @@ from rest_framework import viewsets, filters
 from rest_framework.decorators import api_view, action
 from rest_framework.response import Response
 from django.db.models import Count, Sum, Q
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from .models import Categoria, Equipo, Jugador, Jornada, Partido, Gol, Tarjeta
 from .models.base import Torneo
 from .models.estadisticas import EstadisticaEquipo
@@ -12,6 +13,10 @@ from .serializers import (
     TorneoSerializer, TorneoDetalleSerializer, EstadisticaEquipoSerializer,
     TablaposicionesSerializer
 )
+
+from api.utils.logging_utils import get_logger, log_api_request
+
+logger = get_logger(__name__)
 
 class CategoriaViewSet(viewsets.ModelViewSet):
     """
@@ -24,6 +29,7 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre']
     ordering_fields = ['nombre']
+    permission_classes = [IsAuthenticatedOrReadOnly]
 
 class EquipoViewSet(viewsets.ModelViewSet):
     """
@@ -31,11 +37,12 @@ class EquipoViewSet(viewsets.ModelViewSet):
     
     Un equipo pertenece a una categoría y tiene múltiples jugadores.
     """
-    queryset = Equipo.objects.all()
+    queryset = Equipo.objects.all().select_related('categoria', 'torneo')
     serializer_class = EquipoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre']
     ordering_fields = ['nombre', 'categoria']
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -64,13 +71,14 @@ class JugadorViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar los Jugadores de los equipos.
     
-    Un jugador pertenece a un equipo y puede tener estadísticas como goles y tarjetas.
+    Un jugador pertenece a un equipo y tiene estadísticas asociadas.
     """
-    queryset = Jugador.objects.all()
+    queryset = Jugador.objects.all().select_related('equipo')
     serializer_class = JugadorSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['primer_nombre', 'primer_apellido', 'cedula']
     ordering_fields = ['primer_apellido', 'primer_nombre']
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
     @action(detail=False, methods=['get'])
     def por_equipo(self, request):
@@ -109,10 +117,24 @@ class JornadaViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar las Jornadas de los torneos.
     
-    Una jornada representa una fecha o ronda del torneo y contiene múltiples partidos.
+    Una jornada agrupa varios partidos dentro de un torneo.
     """
-    queryset = Jornada.objects.all().order_by('numero')
+    queryset = Jornada.objects.all().select_related('torneo').order_by('numero')
     serializer_class = JornadaSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    @action(detail=True, methods=['get'])
+    def partidos(self, request, pk=None):
+        """
+        Obtener los partidos de una jornada específica.
+        
+        Retorna:
+        - Lista de partidos de la jornada ordenados por fecha.
+        """
+        jornada = self.get_object()
+        partidos = jornada.partidos.all().select_related('equipo_1', 'equipo_2', 'torneo', 'jornada').order_by('fecha')
+        serializer = PartidoDetalleSerializer(partidos, many=True)
+        return Response(serializer.data)
 
 class PartidoViewSet(viewsets.ModelViewSet):
     """
@@ -121,16 +143,31 @@ class PartidoViewSet(viewsets.ModelViewSet):
     Un partido se juega entre dos equipos, pertenece a una jornada y tiene registros
     asociados como goles y tarjetas.
     """
-    queryset = Partido.objects.all()
+    queryset = Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo')
     serializer_class = PartidoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ['fecha']
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return PartidoDetalleSerializer
         return PartidoSerializer
     
+    @log_api_request(logger)
+    def list(self, request, *args, **kwargs):
+        """Lista todos los partidos (con logging)"""
+        logger.info(f"Listando partidos - Filtros: {request.query_params}")
+        return super().list(request, *args, **kwargs)
+    
+    @log_api_request(logger)
+    def retrieve(self, request, *args, **kwargs):
+        """Obtiene un partido específico (con logging)"""
+        partido_id = kwargs.get('pk')
+        logger.info(f"Obteniendo detalles del partido: {partido_id}")
+        return super().retrieve(request, *args, **kwargs)
+    
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def por_jornada(self, request):
         """
@@ -143,12 +180,22 @@ class PartidoViewSet(viewsets.ModelViewSet):
         - Lista de partidos de la jornada especificada ordenados por fecha
         """
         jornada_id = request.query_params.get('jornada_id')
+        logger.info(f"Filtrando partidos por jornada: {jornada_id}")
+        
         if jornada_id:
-            partidos = Partido.objects.filter(jornada_id=jornada_id).order_by('fecha')
-            serializer = self.get_serializer(partidos, many=True)
-            return Response(serializer.data)
+            try:
+                partidos = Partido.objects.filter(jornada_id=jornada_id).order_by('fecha')
+                serializer = self.get_serializer(partidos, many=True)
+                logger.info(f"Encontrados {len(partidos)} partidos para la jornada {jornada_id}")
+                return Response(serializer.data)
+            except Exception as e:
+                logger.error(f"Error al filtrar partidos por jornada {jornada_id}: {str(e)}")
+                return Response({"error": f"Error al procesar la solicitud: {str(e)}"}, status=500)
+                
+        logger.warning("Solicitud de filtrado por jornada sin jornada_id")
         return Response({"error": "Se requiere el parámetro jornada_id"}, status=400)
     
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def por_equipo(self, request):
         """
@@ -161,69 +208,104 @@ class PartidoViewSet(viewsets.ModelViewSet):
         - Lista de partidos donde el equipo ha participado, ordenados por fecha
         """
         equipo_id = request.query_params.get('equipo_id')
+        logger.info(f"Filtrando partidos por equipo: {equipo_id}")
+        
         if equipo_id:
-            partidos = Partido.objects.filter(equipo_1_id=equipo_id) | Partido.objects.filter(equipo_2_id=equipo_id)
-            partidos = partidos.order_by('fecha')
-            serializer = self.get_serializer(partidos, many=True)
-            return Response(serializer.data)
+            try:
+                partidos = Partido.objects.filter(equipo_1_id=equipo_id) | Partido.objects.filter(equipo_2_id=equipo_id)
+                partidos = partidos.order_by('fecha')
+                serializer = self.get_serializer(partidos, many=True)
+                logger.info(f"Encontrados {len(partidos)} partidos para el equipo {equipo_id}")
+                return Response(serializer.data)
+            except Exception as e:
+                logger.error(f"Error al filtrar partidos por equipo {equipo_id}: {str(e)}")
+                return Response({"error": f"Error al procesar la solicitud: {str(e)}"}, status=500)
+                
+        logger.warning("Solicitud de filtrado por equipo sin equipo_id")
         return Response({"error": "Se requiere el parámetro equipo_id"}, status=400)
     
+    @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def proximos(self, request):
         """
-        Obtener próximos partidos programados.
+        Obtener partidos próximos a disputarse.
         
-        Parámetros:
-        - torneo_id: (opcional) ID del torneo para filtrar los partidos
-        - dias: (opcional) Número de días hacia adelante para buscar (por defecto: 7)
-        - equipo_id: (opcional) ID del equipo para filtrar partidos específicos
+        Parámetros de filtrado:
+        - torneo_id: (opcional) Filtra partidos por torneo
+        - equipo_id: (opcional) Filtra partidos donde participa un equipo específico
+        - dias: (opcional) Número de días hacia adelante para limitar la búsqueda (default: 7)
         
         Retorna:
         - Lista de partidos próximos ordenados por fecha
         """
         from django.utils import timezone
         import datetime
+        from api.utils.date_utils import get_today_date, date_to_datetime, get_date_range
         
         # Parámetros de filtrado
         torneo_id = request.query_params.get('torneo_id')
         equipo_id = request.query_params.get('equipo_id')
         dias = request.query_params.get('dias', 7)
         
+        logger.info(
+            f"Buscando próximos partidos - Filtros: torneo={torneo_id}, "
+            f"equipo={equipo_id}, días={dias}"
+        )
+        
         try:
             dias = int(dias)
         except (ValueError, TypeError):
+            logger.warning(f"Valor de días inválido: '{dias}'. Usando valor por defecto: 7")
             dias = 7
-            
-        # Fecha actual y fecha límite
-        fecha_actual = timezone.now().date()
-        fecha_limite = fecha_actual + datetime.timedelta(days=dias)
         
-        # Construimos el query base
-        queryset = Partido.objects.filter(
-            fecha__gte=fecha_actual,
-            fecha__lte=fecha_limite,
-            completado=False
-        ).select_related('equipo_1', 'equipo_2', 'jornada').order_by('fecha')
-        
-        # Aplicamos filtros adicionales si existen
-        if torneo_id:
-            queryset = queryset.filter(torneo_id=torneo_id)
+        try:
+            # Obtener fechas con manejo adecuado de zona horaria
+            fecha_actual = get_today_date()
+            fecha_limite = fecha_actual + datetime.timedelta(days=dias)
             
-        if equipo_id:
-            queryset = queryset.filter(
-                Q(equipo_1_id=equipo_id) | Q(equipo_2_id=equipo_id)
+            logger.debug(
+                f"Rango de fechas: desde {fecha_actual.isoformat()} "
+                f"hasta {fecha_limite.isoformat()}"
             )
-        
-        serializer = PartidoDetalleSerializer(queryset, many=True)
-        
-        return Response({
-            'periodo': {
-                'desde': fecha_actual.strftime('%Y-%m-%d'),
-                'hasta': fecha_limite.strftime('%Y-%m-%d'),
-            },
-            'total_partidos': queryset.count(),
-            'partidos': serializer.data
-        })
+            
+            # Convertir a datetime con zona horaria para el filtrado
+            fecha_inicio_dt, fecha_fin_dt = get_date_range(fecha_actual, dias)
+            
+            # Construimos el query base
+            queryset = Partido.objects.filter(
+                fecha__gte=fecha_inicio_dt,
+                fecha__lte=fecha_fin_dt,
+                completado=False
+            ).select_related('equipo_1', 'equipo_2', 'torneo', 'jornada').order_by('fecha')
+            
+            # Aplicamos filtros adicionales si existen
+            if torneo_id:
+                queryset = queryset.filter(torneo_id=torneo_id)
+                
+            if equipo_id:
+                queryset = queryset.filter(
+                    Q(equipo_1_id=equipo_id) | Q(equipo_2_id=equipo_id)
+                )
+            
+            serializer = PartidoDetalleSerializer(queryset, many=True)
+            
+            logger.info(f"Encontrados {queryset.count()} partidos próximos")
+            
+            return Response({
+                'periodo': {
+                    'desde': fecha_actual.strftime('%Y-%m-%d'),
+                    'hasta': fecha_limite.strftime('%Y-%m-%d'),
+                },
+                'total_partidos': queryset.count(),
+                'partidos': serializer.data
+            })
+            
+        except Exception as e:
+            logger.error(f"Error al buscar partidos próximos: {str(e)}", exc_info=True)
+            return Response(
+                {"error": "Se produjo un error al procesar la solicitud"}, 
+                status=500
+            )
 
 class GolViewSet(viewsets.ModelViewSet):
     """
@@ -231,8 +313,9 @@ class GolViewSet(viewsets.ModelViewSet):
     
     Un gol es anotado por un jugador en un partido específico.
     """
-    queryset = Gol.objects.all()
+    queryset = Gol.objects.all().select_related('jugador', 'partido')
     serializer_class = GolSerializer
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
     @action(detail=False, methods=['get'])
     def por_partido(self, request):
@@ -258,10 +341,11 @@ class TarjetaViewSet(viewsets.ModelViewSet):
     
     Una tarjeta es mostrada a un jugador en un partido específico.
     """
-    queryset = Tarjeta.objects.all()
+    queryset = Tarjeta.objects.all().select_related('jugador', 'partido')
     serializer_class = TarjetaSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['jugador__primer_nombre', 'jugador__primer_apellido']
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
     @action(detail=False, methods=['get'])
     def por_tipo(self, request):
@@ -287,11 +371,12 @@ class TorneoViewSet(viewsets.ModelViewSet):
     
     Un torneo es la competición principal que agrupa equipos, partidos y estadísticas.
     """
-    queryset = Torneo.objects.all().order_by('-fecha_inicio')
+    queryset = Torneo.objects.all().select_related('categoria').order_by('-fecha_inicio')
     serializer_class = TorneoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre', 'categoria__nombre']
     ordering_fields = ['nombre', 'fecha_inicio', 'categoria']
+    permission_classes = [IsAuthenticatedOrReadOnly]
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
@@ -306,7 +391,11 @@ class TorneoViewSet(viewsets.ModelViewSet):
         Retorna:
         - Lista de torneos que están actualmente en curso, ordenados por fecha de inicio.
         """
-        torneos_activos = Torneo.objects.filter(activo=True, finalizado=False).order_by('-fecha_inicio')
+        torneos_activos = Torneo.objects.filter(
+            activo=True, 
+            finalizado=False
+        ).select_related('categoria').order_by('-fecha_inicio')
+        
         serializer = self.get_serializer(torneos_activos, many=True)
         return Response(serializer.data)
     
