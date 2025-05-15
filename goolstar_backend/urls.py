@@ -51,3 +51,9 @@ urlpatterns = [
 # Configuración para servir archivos multimedia durante el desarrollo
 if settings.DEBUG:
     urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    
+    # Añadir URLs de Debug Toolbar cuando DEBUG está activado
+    import debug_toolbar
+    urlpatterns += [
+        path('__debug__/', include(debug_toolbar.urls)),
+    ]
