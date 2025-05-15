@@ -74,21 +74,32 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'api.middleware.logging_middleware.RequestLoggingMiddleware',  # Middleware para logging HTTP
 ]
+
 # Configuración de CORS
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',  # Para desarrollo con Next.js
     'https://goolstar-frontend.fly.dev',  # Para producción (ajusta según tu dominio)
+    'https://goolstar-backend.fly.dev',   # Dominio de la API en Fly.io
 ]
 
 # Configuración de seguridad para producción
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
+    # Temporalmente desactivamos la redirección SSL forzada para solucionar problemas de despliegue
+    # en Fly.io. Normalmente debería estar activada en producción.
+    SECURE_SSL_REDIRECT = False  # Cambiado temporalmente de True a False
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000  # 1 año
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# Configuración de CSRF para Fly.io
+CSRF_TRUSTED_ORIGINS = [
+    'https://goolstar-backend.fly.dev',
+    'http://localhost:8000',
+]
 
 ROOT_URLCONF = 'goolstar_backend.urls'
 
@@ -116,12 +127,32 @@ WSGI_APPLICATION = 'goolstar_backend.wsgi.application'
 import dj_database_url
 
 # Configuración por defecto (SQLite para desarrollo)
-DATABASES = {
-    'default': dj_database_url.config(
-        default=os.environ.get('DATABASE_URL'),  
-        conn_max_age=600
-    )
-}
+if 'DATABASE_URL' in os.environ:
+    # Configuración para producción con PostgreSQL
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.environ.get('DATABASE_NAME', 'postgres'),
+            'USER': os.environ.get('DATABASE_USER', 'postgres'),
+            'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
+            'HOST': os.environ.get('DATABASE_HOST', 'localhost'),
+            'PORT': os.environ.get('DATABASE_PORT', '5432'),
+            'CONN_MAX_AGE': 600,
+        }
+    }
+    
+    # También intentamos parsear DATABASE_URL si está presente
+    db_from_env = dj_database_url.config(conn_max_age=600)
+    if db_from_env:
+        DATABASES['default'].update(db_from_env)
+else:
+    # Configuración para desarrollo
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db_local.sqlite3',
+        }
+    }
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -228,6 +259,14 @@ LOGGING = {
             'class': 'django.utils.log.AdminEmailHandler',
             'formatter': 'verbose',
         },
+        'timezone_file': {
+            'level': 'DEBUG',
+            'class': 'logging.handlers.RotatingFileHandler',
+            'filename': LOGS_DIR / 'timezone.log',
+            'maxBytes': 5 * 1024 * 1024,  # 5 MB
+            'backupCount': 5,
+            'formatter': 'verbose',
+        },
     },
     'loggers': {
         'django': {
@@ -256,8 +295,24 @@ LOGGING = {
             'level': 'DEBUG',
             'propagate': True,
         },
+        'api.middleware.logging': {
+            'handlers': ['console', 'file_info', 'file_error'],
+            'level': 'INFO',
+            'propagate': False,
+        },
+        'api.utils.tz_logging': {
+            'handlers': ['console', 'timezone_file', 'file_error'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
         'goolstar_backend': {
             'handlers': ['console', 'file_info', 'file_error'],
+            'level': 'DEBUG',
+            'propagate': True,
+        },
+        # Añadir loggers específicos para módulos con zona horaria
+        '*.timezone': {
+            'handlers': ['timezone_file', 'file_error'],
             'level': 'DEBUG',
             'propagate': True,
         },
