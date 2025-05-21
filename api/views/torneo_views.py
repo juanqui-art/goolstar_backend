@@ -78,34 +78,70 @@ class TorneoViewSet(viewsets.ModelViewSet):
         logger.info(f"Torneos activos encontrados: {queryset.count()}")
         
         return Response(serializer.data)
-    
+
     @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def tabla_posiciones(self, request, pk=None):
         """
         Obtener tabla de posiciones del torneo.
-        
+
         Parámetros:
         - grupo: (opcional) Filtrar por grupo específico (A, B, C, etc.)
-        
+        - actualizar: (opcional) Si es "true", fuerza la actualización de todas las estadísticas
+
         Retorna:
         - Tabla de posiciones con estadísticas de equipos ordenadas por puntos,
           diferencia de goles y goles a favor.
         """
         torneo = self.get_object()
         grupo = request.query_params.get('grupo')
-        
+        actualizar = request.query_params.get('actualizar', 'false').lower() == 'true'
+
+        # Si se solicita actualización, crear y actualizar estadísticas para todos los equipos
+        if actualizar:
+            logger.info(f"Forzando actualización de estadísticas para torneo {torneo.id}")
+            equipos_query = torneo.equipos.filter(activo=True)
+
+            # Filtrar por grupo si es necesario
+            if grupo:
+                equipos_query = equipos_query.filter(grupo=grupo.upper())
+
+            # Crear o actualizar estadísticas para cada equipo
+            for equipo in equipos_query:
+                try:
+                    estadistica, created = EstadisticaEquipo.objects.get_or_create(
+                        equipo=equipo,
+                        torneo=torneo
+                    )
+                    estadistica.actualizar_estadisticas()
+                    logger.info(f"Estadísticas actualizadas para equipo {equipo.nombre}")
+                except Exception as e:
+                    logger.error(f"Error actualizando estadísticas para equipo {equipo.nombre}: {str(e)}")
+
+        # Asegurar que existan registros de estadísticas para todos los equipos
+        # aunque no se haya solicitado actualización explícita
+        equipos_sin_estadisticas = torneo.equipos.filter(
+            activo=True,
+            estadisticas__isnull=True
+        )
+
+        # Si hay equipos sin estadísticas, crearlas
+        if equipos_sin_estadisticas.exists():
+            logger.info(f"Creando estadísticas faltantes para {equipos_sin_estadisticas.count()} equipos")
+            for equipo in equipos_sin_estadisticas:
+                EstadisticaEquipo.objects.create(equipo=equipo, torneo=torneo)
+
         # Base query para estadísticas
         estadisticas_query = EstadisticaEquipo.objects.filter(
             torneo=torneo
         ).select_related('equipo').order_by('-puntos', '-diferencia_goles', '-goles_favor')
-        
+
         # Si se especifica un grupo, filtrar por grupo
         if grupo:
             estadisticas_query = estadisticas_query.filter(equipo__grupo=grupo.upper())
-        
+
         serializer = EstadisticaEquipoSerializer(estadisticas_query, many=True)
-        
+
         # Preparamos la respuesta con el formato adecuado
         response_data = {
             'grupo': grupo.upper() if grupo else 'Todos',
