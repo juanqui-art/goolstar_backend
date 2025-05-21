@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Historial de Partidos - {{ equipo.nombre }}</title>
+    <style>
+        @page {
+            size: letter portrait;
+            margin: 2cm;
+        }
+        body {
+            font-family: Arial, sans-serif;
+            color: #333;
+            line-height: 1.5;
+        }
+        .header {
+            width: 100%;
+            text-align: center;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+        }
+        .header img {
+            max-height: 80px;
+            margin: 10px auto;
+        }
+        h1 {
+            color: #1a5276;
+            font-size: 24px;
+            margin: 5px 0;
+        }
+        .info {
+            margin-bottom: 20px;
+        }
+        .info p {
+            margin: 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 30px;
+        }
+        th {
+            background-color: #1a5276;
+            color: white;
+            font-weight: bold;
+            text-align: left;
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        td {
+            padding: 8px;
+            border: 1px solid #ddd;
+        }
+        tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+        .resultado {
+            font-weight: bold;
+            text-align: center;
+        }
+        .victoria {
+            color: green;
+        }
+        .derrota {
+            color: red;
+        }
+        .empate {
+            color: #666;
+        }
+        .fecha {
+            white-space: nowrap;
+        }
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            padding-top: 5px;
+            border-top: 1px solid #ddd;
+            font-size: 9px;
+            text-align: center;
+            color: #777;
+        }
+        .equipo-nombre {
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        {% if equipo.logo %}
+        <img src="{{ equipo.logo.url }}" alt="Logo {{ equipo.nombre }}">
+        {% endif %}
+        <h1>HISTORIAL DE PARTIDOS</h1>
+        <h2>{{ equipo.nombre }}</h2>
+    </div>
+
+    <div class="info">
+        <p><strong>Categoría:</strong> {{ equipo.categoria.nombre }}</p>
+        <p><strong>Torneo:</strong> {{ equipo.torneo.nombre }}</p>
+        <p><strong>Grupo:</strong> {{ equipo.grupo }}</p>
+        <p><strong>Dirigente:</strong> {% if equipo.dirigente %}{{ equipo.dirigente.nombre }}{% else %}No asignado{% endif %}</p>
+        <p><strong>Fecha de impresión:</strong> {{ fecha_actual|date:"d/m/Y" }}</p>
+    </div>
+
+    <table>
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Fecha</th>
+                <th>Rival</th>
+                <th>Jornada</th>
+                <th>Goles {{ equipo.nombre }}</th>
+                <th>Goles Rival</th>
+                <th>Resultado</th>
+                <th>Estado</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for partido in partidos %}
+            <tr>
+                <td>{{ forloop.counter }}</td>
+                <td class="fecha">{{ partido.fecha|date:"d/m/Y H:i" }}</td>
+                <td>
+                    {% if partido.equipo_1 == equipo %}
+                        {{ partido.equipo_2.nombre }}
+                    {% else %}
+                        {{ partido.equipo_1.nombre }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if partido.jornada %}
+                        {{ partido.jornada.nombre }}
+                    {% elif partido.fase_eliminatoria %}
+                        {{ partido.fase_eliminatoria.nombre }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="resultado">
+                    {% if partido.completado %}
+                        {% if partido.equipo_1 == equipo %}
+                            {{ partido.goles_equipo_1 }}
+                        {% else %}
+                            {{ partido.goles_equipo_2 }}
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="resultado">
+                    {% if partido.completado %}
+                        {% if partido.equipo_1 == equipo %}
+                            {{ partido.goles_equipo_2 }}
+                        {% else %}
+                            {{ partido.goles_equipo_1 }}
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td class="resultado
+                    {% if partido.completado %}
+                        {% if partido.equipo_1 == equipo %}
+                            {% if partido.goles_equipo_1 > partido.goles_equipo_2 %}
+                                victoria
+                            {% elif partido.goles_equipo_1 < partido.goles_equipo_2 %}
+                                derrota
+                            {% else %}
+                                empate
+                            {% endif %}
+                        {% else %}
+                            {% if partido.goles_equipo_2 > partido.goles_equipo_1 %}
+                                victoria
+                            {% elif partido.goles_equipo_2 < partido.goles_equipo_1 %}
+                                derrota
+                            {% else %}
+                                empate
+                            {% endif %}
+                        {% endif %}
+                    {% endif %}">
+                    {% if partido.completado %}
+                        {% if partido.equipo_1 == equipo %}
+                            {% if partido.goles_equipo_1 > partido.goles_equipo_2 %}
+                                VICTORIA
+                            {% elif partido.goles_equipo_1 < partido.goles_equipo_2 %}
+                                DERROTA
+                            {% else %}
+                                EMPATE
+                            {% endif %}
+                        {% else %}
+                            {% if partido.goles_equipo_2 > partido.goles_equipo_1 %}
+                                VICTORIA
+                            {% elif partido.goles_equipo_2 < partido.goles_equipo_1 %}
+                                DERROTA
+                            {% else %}
+                                EMPATE
+                            {% endif %}
+                        {% endif %}
+                        {% if partido.es_eliminatorio and partido.penales_equipo_1 is not None %}
+                            <br><small>({{ partido.penales_equipo_1 }} - {{ partido.penales_equipo_2 }} pen.)</small>
+                        {% endif %}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+                <td>
+                    {% if partido.completado %}
+                        Completado
+                    {% else %}
+                        Pendiente
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="8" style="text-align: center;">No hay partidos registrados para este equipo</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <p>GoolStar - Sistema de Administración de Torneos | Documento generado el {{ fecha_actual|date:"d/m/Y" }}</p>
+    </div>
+</body>
+</html>
