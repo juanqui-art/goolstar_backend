@@ -101,10 +101,20 @@ class TorneoAPIEdgeCaseTests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         
-        # Verificar que la estructura es correcta pero no hay datos de estadísticas
+        # Verificar que la estructura es correcta
         self.assertIn('grupo', response.data)
         self.assertIn('equipos', response.data)
-        self.assertEqual(len(response.data['equipos']), 0)  # No hay estadísticas aún
+
+        # Verificar que hay equipos pero con estadísticas en cero
+        equipos = response.data['equipos']
+        self.assertEqual(len(equipos), 2)  # Ahora esperamos 2 equipos
+
+        # Verificar que las estadísticas están en cero para ambos equipos
+        for equipo in equipos:
+            self.assertEqual(equipo['partidos_jugados'], 0)
+            self.assertEqual(equipo['puntos'], 0)
+            self.assertEqual(equipo['goles_favor'], 0)
+            self.assertEqual(equipo['goles_contra'], 0)
 
     def test_torneo_no_existe(self):
         """
