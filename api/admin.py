@@ -1,5 +1,12 @@
 from django import forms
 from django.contrib import admin
+from django.utils.html import format_html
+from django.http import HttpResponse
+from django.template.loader import get_template
+from xhtml2pdf import pisa
+from io import BytesIO
+from django.db import models
+from django.utils import timezone
 
 # Importaciones de modelos base
 from .models.base import Categoria, Torneo, FaseEliminatoria
@@ -145,11 +152,12 @@ class JugadorInline(admin.TabularInline):
 
 @admin.register(Equipo)
 class EquipoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'categoria', 'torneo', 'grupo', 'nivel', 'activo', 'deuda_total')
+    list_display = ('nombre', 'categoria', 'torneo', 'grupo', 'nivel', 'activo', 'deuda_total', 'numero_jugadores')
     list_filter = ('categoria', 'torneo', 'activo', 'grupo')
     search_fields = ('nombre',)
     list_select_related = ('categoria', 'torneo')  # Optimización para evitar N+1 queries
     inlines = [JugadorInline]
+    actions = ['descargar_lista_jugadores_pdf']
 
     fieldsets = (
         ('Información básica', {
@@ -170,6 +178,61 @@ class EquipoAdmin(admin.ModelAdmin):
             'classes': ('collapse',)
         }),
     )
+    
+    def numero_jugadores(self, obj):
+        """Muestra el número de jugadores y lo resalta en rojo si excede 12"""
+        count = obj.jugadores.count()
+        if count > 12:
+            return format_html('<span style="color: red; font-weight: bold;">{}</span>', count)
+        return count
+    
+    numero_jugadores.short_description = "Jugadores"
+    numero_jugadores.admin_order_field = 'jugadores__count'
+    
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        queryset = queryset.annotate(
+            jugadores__count=models.Count('jugadores')
+        )
+        return queryset
+    
+    def descargar_lista_jugadores_pdf(self, request, queryset):
+        """Genera un PDF con la lista de jugadores del equipo seleccionado"""
+        if len(queryset) != 1:
+            self.message_user(request, "Por favor seleccione solo un equipo a la vez para descargar la lista", level='WARNING')
+            return
+            
+        equipo = queryset.first()
+        
+        # Obtener jugadores del equipo
+        jugadores = equipo.jugadores.all().order_by('numero_dorsal')
+        
+        # Preparar contexto para la plantilla
+        context = {
+            'equipo': equipo,
+            'jugadores': jugadores,
+            'fecha_actual': timezone.now().date(),
+        }
+        
+        # Renderizar plantilla a HTML
+        template = get_template('admin/equipos/lista_jugadores_pdf.html')
+        html = template.render(context)
+        
+        # Crear PDF a partir del HTML
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        
+        if not pdf.err:
+            # Configurar respuesta HTTP con PDF
+            filename = f"Lista_Jugadores_{equipo.nombre}_{timezone.now().strftime('%Y%m%d')}.pdf"
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        
+        self.message_user(request, "Error al generar PDF", level='ERROR')
+        return None
+        
+    descargar_lista_jugadores_pdf.short_description = "Descargar lista de jugadores en PDF"
 
 
 @admin.register(Jugador)
