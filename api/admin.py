@@ -303,18 +303,44 @@ class PartidoForm(forms.ModelForm):
         return cleaned_data
 
 
+from django.contrib.admin import SimpleListFilter
+
+# Custom filter for teams in Partido admin
+class EquipoFilter(SimpleListFilter):
+    title = 'Filtrar por equipo'  # Título más claro en español
+    parameter_name = 'equipo'
+    
+    def lookups(self, request, model_admin):
+        # Get all teams involved in any matches - mantenemos la lógica de búsqueda igual
+        equipos = Equipo.objects.filter(
+            models.Q(partidos_como_local__isnull=False) | 
+            models.Q(partidos_como_visitante__isnull=False)
+        ).distinct().order_by('nombre')
+        return [(str(equipo.id), equipo.nombre) for equipo in equipos]
+    
+    def queryset(self, request, queryset):
+        if not self.value():
+            return queryset
+        # Mantenemos la lógica de filtrado igual
+        return queryset.filter(
+            models.Q(equipo_1__id=self.value()) | 
+            models.Q(equipo_2__id=self.value())
+        )
+
+
 @admin.register(Partido)
 class PartidoAdmin(admin.ModelAdmin):
     form = PartidoForm
     list_display = ('__str__', 'jornada', 'fecha', 'goles_equipo_1', 'goles_equipo_2', 'completado')
-    list_filter = ('jornada', 'completado', 'equipo_1__categoria', 'torneo', 'equipo_1__grupo')
-    search_fields = ('equipo_1__nombre', 'equipo_2__nombre')
+    list_filter = (EquipoFilter, 'jornada', 'completado', 'equipo_1__categoria', 'torneo', 'equipo_1__grupo', 'fase_eliminatoria')
+    search_fields = ('equipo_1__nombre', 'equipo_2__nombre', 'arbitro__nombres', 'arbitro__apellidos', 'cancha')
     date_hierarchy = 'fecha'
     ordering = ('-fecha',)
     list_per_page = 25
     inlines = [GolInline, TarjetaInline, CambioJugadorInline]
-    list_select_related = ('jornada', 'equipo_1', 'equipo_2', 'arbitro')  # Optimización para evitar N+1 queries
-
+    list_select_related = ('jornada', 'equipo_1', 'equipo_2', 'arbitro', 'torneo', 'fase_eliminatoria')
+    actions = ['marcar_como_completados']
+    
     fieldsets = (
         ('Información general', {
             'fields': ('torneo', 'jornada', 'fase_eliminatoria', 'fecha', 'arbitro', 'cancha')
@@ -334,11 +360,11 @@ class PartidoAdmin(admin.ModelAdmin):
             'fields': ('observaciones', 'acta_firmada', 'acta_firmada_equipo_1', 'acta_firmada_equipo_2')
         }),
     )
-
+    
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         return qs.select_related('equipo_1', 'equipo_2', 'jornada', 'torneo', 'arbitro')
-
+    
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Filtra equipos por grupo si se está creando un partido nuevo"""
         if db_field.name == "equipo_1" and request.GET.get('grupo'):
@@ -348,6 +374,13 @@ class PartidoAdmin(admin.ModelAdmin):
             grupo = request.GET.get('grupo')
             kwargs["queryset"] = Equipo.objects.filter(grupo=grupo, activo=True)
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
+    
+    def marcar_como_completados(self, request, queryset):
+        """Marca los partidos seleccionados como completados"""
+        partidos_actualizados = queryset.update(completado=True)
+        self.message_user(request, f"{partidos_actualizados} partidos han sido marcados como completados.")
+    
+    marcar_como_completados.short_description = "Marcar partidos como completados"
 
 
 @admin.register(Gol)
