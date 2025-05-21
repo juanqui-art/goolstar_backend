@@ -157,7 +157,7 @@ class EquipoAdmin(admin.ModelAdmin):
     search_fields = ('nombre',)
     list_select_related = ('categoria', 'torneo')  # Optimización para evitar N+1 queries
     inlines = [JugadorInline]
-    actions = ['descargar_lista_jugadores_pdf']
+    actions = ['descargar_lista_jugadores_pdf', 'descargar_historial_partidos_pdf']
 
     fieldsets = (
         ('Información básica', {
@@ -233,6 +233,45 @@ class EquipoAdmin(admin.ModelAdmin):
         return None
         
     descargar_lista_jugadores_pdf.short_description = "Descargar lista de jugadores en PDF"
+    
+    def descargar_historial_partidos_pdf(self, request, queryset):
+        """Genera un PDF con el historial de partidos del equipo seleccionado, ordenados por fecha"""
+        if len(queryset) != 1:
+            self.message_user(request, "Por favor seleccione solo un equipo a la vez para descargar el historial", level='WARNING')
+            return
+            
+        equipo = queryset.first()
+        
+        # Obtener todos los partidos donde participó el equipo (como local o visitante)
+        partidos = Partido.objects.filter(
+            models.Q(equipo_1=equipo) | models.Q(equipo_2=equipo)
+        ).order_by('fecha')
+        
+        # Preparar contexto para la plantilla
+        context = {
+            'equipo': equipo,
+            'partidos': partidos,
+            'fecha_actual': timezone.now().date(),
+        }
+        
+        # Renderizar plantilla a HTML
+        template = get_template('admin/equipos/historial_partidos_pdf.html')
+        html = template.render(context)
+        
+        # Crear PDF a partir del HTML
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        
+        if not pdf.err:
+            # Configurar respuesta HTTP con PDF
+            filename = f"Historial_Partidos_{equipo.nombre}_{timezone.now().strftime('%Y%m%d')}.pdf"
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        
+        self.message_user(request, "Error al generar el PDF", level='ERROR')
+    
+    descargar_historial_partidos_pdf.short_description = "Descargar historial de partidos en PDF fase grupos"
 
 
 @admin.register(Jugador)
