@@ -6,13 +6,21 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from django.db.models import Count
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework import serializers
+from rest_framework.pagination import PageNumberPagination
 
 from api.models import Jugador
 from api.serializers import JugadorSerializer
 from api.utils.logging_utils import get_logger, log_api_request
 from api.utils.date_utils import get_today_date
+from django.db.models import Q
 
 logger = get_logger(__name__)
+
+class StandardResultsSetPagination(PageNumberPagination):
+    page_size = 10
+    page_size_query_param = 'page_size'
+    max_page_size = 1000
 
 class JugadorViewSet(viewsets.ModelViewSet):
     """
@@ -26,6 +34,7 @@ class JugadorViewSet(viewsets.ModelViewSet):
     search_fields = ['primer_nombre', 'primer_apellido', 'cedula']
     ordering_fields = ['primer_apellido', 'primer_nombre']
     permission_classes = [IsAuthenticatedOrReadOnly]
+    pagination_class = StandardResultsSetPagination
 
     @log_api_request(logger)
     def list(self, request, *args, **kwargs):
@@ -72,6 +81,7 @@ class JugadorViewSet(viewsets.ModelViewSet):
         
         Retorna:
         - Lista de jugadores ordenados por la cantidad de goles marcados (descendente)
+        - Soporta paginación a través de los parámetros estándar de DRF (page, page_size)
         """
         logger.info(f"Generando listado de goleadores - Usuario: {request.user}")
         
@@ -79,11 +89,38 @@ class JugadorViewSet(viewsets.ModelViewSet):
         today = get_today_date()
         logger.debug(f"Fecha actual para filtro de goleadores: {today}")
         
+        # Consulta base con anotación de total_goles
         queryset = Jugador.objects.annotate(
-            total_goles=Count('gol')
-        ).filter(total_goles__gt=0).order_by('-total_goles', 'primer_apellido')
+            total_goles=Count('goles')
+        ).filter(total_goles__gt=0)
         
+        # Aplicar filtros adicionales si es necesario (por ejemplo, por torneo)
+        torneo_id = request.query_params.get('torneo')
+        if torneo_id:
+            queryset = Jugador.objects.annotate(
+                total_goles=Count('goles', filter=Q(goles__partido__torneo_id=torneo_id))
+            ).filter(total_goles__gt=0)
+        
+        # Siempre ordenar por total_goles (descendente) y luego por apellido
+        queryset = queryset.order_by('-total_goles', 'primer_apellido')
+        
+        # Paginación
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            data = serializer.data
+            # Añadir total_goles a cada jugador en la respuesta
+            for i, jugador in enumerate(page):
+                data[i]['total_goles'] = jugador.total_goles
+            
+            logger.info(f"Goleadores paginados: {len(page)} de {queryset.count()}")
+            return self.get_paginated_response(data)
+        
+        # Sin paginación (caso fallback)
         serializer = self.get_serializer(queryset, many=True)
-        logger.info(f"Total de goleadores encontrados: {queryset.count()}")
+        data = serializer.data
+        for i, jugador in enumerate(queryset):
+            data[i]['total_goles'] = jugador.total_goles
         
-        return Response(serializer.data)
+        logger.info(f"Total de goleadores encontrados: {queryset.count()}")
+        return Response(data)
