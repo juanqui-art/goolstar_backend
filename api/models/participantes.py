@@ -37,6 +37,12 @@ class Equipo(models.Model):
         GRUPO_C = 'C', _('Grupo C')
         GRUPO_D = 'D', _('Grupo D')
 
+    class Estado(models.TextChoices):
+        """Estado de participación del equipo en el torneo"""
+        ACTIVO = 'activo', _('Activo')
+        RETIRADO = 'retirado', _('Retirado')
+        SUSPENDIDO = 'suspendido', _('Suspendido')
+
     nombre = models.CharField(max_length=100)
     categoria = models.ForeignKey(Categoria, on_delete=models.CASCADE, related_name='equipos')
     torneo = models.ForeignKey(Torneo, on_delete=models.CASCADE, related_name='equipos')
@@ -47,6 +53,8 @@ class Equipo(models.Model):
     nivel = models.IntegerField(choices=Nivel.choices, default=Nivel.MEDIO)
     fecha_registro = models.DateTimeField(auto_now_add=True)
     activo = models.BooleanField(default=True)
+    estado = models.CharField(max_length=15, choices=Estado.choices, default=Estado.ACTIVO)
+    fecha_retiro = models.DateTimeField(null=True, blank=True)
     
     # Campos para fase de grupos
     grupo = models.CharField(max_length=1, choices=Grupo.choices, blank=True)

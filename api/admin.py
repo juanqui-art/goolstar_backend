@@ -152,12 +152,12 @@ class JugadorInline(admin.TabularInline):
 
 @admin.register(Equipo)
 class EquipoAdmin(admin.ModelAdmin):
-    list_display = ('nombre', 'categoria', 'torneo', 'grupo', 'nivel', 'activo', 'deuda_total', 'numero_jugadores')
-    list_filter = ('categoria', 'torneo', 'activo', 'grupo')
+    list_display = ('nombre', 'categoria', 'torneo', 'grupo', 'nivel', 'activo', 'estado', 'deuda_total', 'numero_jugadores')
+    list_filter = ('categoria', 'torneo', 'activo', 'estado', 'grupo')
     search_fields = ('nombre',)
     list_select_related = ('categoria', 'torneo')  # Optimización para evitar N+1 queries
     inlines = [JugadorInline]
-    actions = ['descargar_lista_jugadores_pdf', 'descargar_historial_partidos_pdf']
+    actions = ['descargar_lista_jugadores_pdf', 'descargar_historial_partidos_pdf', 'marcar_como_retirados']
 
     fieldsets = (
         ('Información básica', {
@@ -171,7 +171,7 @@ class EquipoAdmin(admin.ModelAdmin):
             'fields': ('logo', 'color_principal', 'color_secundario', 'nivel')
         }),
         ('Estado', {
-            'fields': ('activo', 'inasistencias', 'excluido_por_inasistencias')
+            'fields': ('activo', 'estado', 'fecha_retiro', 'inasistencias', 'excluido_por_inasistencias')
         }),
         ('Progreso', {
             'fields': ('clasificado_fase_grupos', 'fase_actual', 'eliminado_en_fase'),
@@ -186,8 +186,25 @@ class EquipoAdmin(admin.ModelAdmin):
             return format_html('<span style="color: red; font-weight: bold;">{}</span>', count)
         return count
     
-    numero_jugadores.short_description = "Jugadores"
-    numero_jugadores.admin_order_field = 'jugadores__count'
+    def marcar_como_retirados(self, request, queryset):
+        """Marca los equipos seleccionados como retirados"""
+        from django.utils import timezone
+        fecha_actual = timezone.now()
+        
+        equipos_actualizados = 0
+        for equipo in queryset:
+            if equipo.estado != Equipo.Estado.RETIRADO:
+                equipo.estado = Equipo.Estado.RETIRADO
+                equipo.fecha_retiro = fecha_actual
+                equipo.activo = False
+                equipo.save()
+                equipos_actualizados += 1
+                
+        self.message_user(
+            request,
+            f"{equipos_actualizados} equipo(s) han sido marcados como retirados."
+        )
+    marcar_como_retirados.short_description = "Marcar equipos seleccionados como retirados"
     
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
