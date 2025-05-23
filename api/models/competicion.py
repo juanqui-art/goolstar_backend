@@ -46,6 +46,16 @@ class Partido(models.Model):
     goles_equipo_1 = models.PositiveSmallIntegerField(default=0)
     goles_equipo_2 = models.PositiveSmallIntegerField(default=0)
 
+    # Campos para victoria por default
+    MOTIVO_VICTORIA_CHOICES = [
+        ('', 'Normal'),
+        ('retiro', 'Retiro de equipo'),
+        ('inasistencia', 'Inasistencia'),
+        ('sancion', 'Sanción administrativa')
+    ]
+    victoria_por_default = models.CharField(max_length=20, choices=MOTIVO_VICTORIA_CHOICES, blank=True)
+    equipo_ganador_default = models.ForeignKey(Equipo, on_delete=models.SET_NULL, null=True, blank=True, related_name='victorias_por_default')
+
     # Campos para partidos de eliminación directa
     es_eliminatorio = models.BooleanField(default=False)
     penales_equipo_1 = models.PositiveSmallIntegerField(blank=True, null=True)
