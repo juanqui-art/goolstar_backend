@@ -423,14 +423,14 @@ class EquipoFilter(SimpleListFilter):
 @admin.register(Partido)
 class PartidoAdmin(admin.ModelAdmin):
     form = PartidoForm
-    list_display = ('__str__', 'jornada', 'fecha', 'goles_equipo_1', 'goles_equipo_2', 'completado')
-    list_filter = (EquipoFilter, 'jornada', 'completado', 'equipo_1__categoria', 'torneo', 'equipo_1__grupo', 'fase_eliminatoria')
+    list_display = ('__str__', 'jornada', 'fecha', 'goles_equipo_1', 'goles_equipo_2', 'completado', 'mostrar_victoria_default')
+    list_filter = (EquipoFilter, 'jornada', 'completado', 'equipo_1__categoria', 'torneo', 'equipo_1__grupo', 'fase_eliminatoria', 'victoria_por_default')
     search_fields = ('equipo_1__nombre', 'equipo_2__nombre', 'arbitro__nombres', 'arbitro__apellidos', 'cancha')
     date_hierarchy = 'fecha'
     ordering = ('-fecha',)
     list_per_page = 25
     inlines = [GolInline, TarjetaInline, CambioJugadorInline]
-    list_select_related = ('jornada', 'equipo_1', 'equipo_2', 'arbitro', 'torneo', 'fase_eliminatoria')
+    list_select_related = ('jornada', 'equipo_1', 'equipo_2', 'arbitro', 'torneo', 'fase_eliminatoria', 'equipo_ganador_default')
     actions = ['marcar_como_completados']
     
     def get_formsets_with_inlines(self, request, obj=None):
@@ -454,6 +454,10 @@ class PartidoAdmin(admin.ModelAdmin):
             'fields': ('goles_equipo_1', 'goles_equipo_2', 'completado', 'es_eliminatorio',
                        'penales_equipo_1', 'penales_equipo_2')
         }),
+        ('Victoria por default', {
+            'fields': ('victoria_por_default', 'equipo_ganador_default'),
+            'description': 'Utilizar solo cuando un equipo gana sin jugar el partido normalmente (por retiro, inasistencia o sanción)'
+        }),
         ('Control de asistencia', {
             'fields': ('inasistencia_equipo_1', 'inasistencia_equipo_2', 'equipo_pone_balon')
         }),
@@ -464,7 +468,7 @@ class PartidoAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('equipo_1', 'equipo_2', 'jornada', 'torneo', 'arbitro')
+        return qs.select_related('equipo_1', 'equipo_2', 'jornada', 'torneo', 'arbitro', 'equipo_ganador_default')
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Filtra equipos por grupo si se está creando un partido nuevo"""
@@ -474,6 +478,12 @@ class PartidoAdmin(admin.ModelAdmin):
         if db_field.name == "equipo_2" and request.GET.get('grupo'):
             grupo = request.GET.get('grupo')
             kwargs["queryset"] = Equipo.objects.filter(grupo=grupo, activo=True)
+        if db_field.name == "equipo_ganador_default":
+            if hasattr(self, 'parent_obj') and self.parent_obj:
+                # Limitar opciones a los equipos que participan en este partido
+                kwargs["queryset"] = Equipo.objects.filter(
+                    id__in=[self.parent_obj.equipo_1.id, self.parent_obj.equipo_2.id]
+                )
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
     
     def marcar_como_completados(self, request, queryset):
@@ -482,6 +492,28 @@ class PartidoAdmin(admin.ModelAdmin):
         self.message_user(request, f"{partidos_actualizados} partidos han sido marcados como completados.")
     
     marcar_como_completados.short_description = "Marcar partidos como completados"
+    
+    def mostrar_victoria_default(self, obj):
+        """Muestra visualmente si un partido tiene victoria por default"""
+        if not obj.victoria_por_default:
+            return ''
+        
+        motivos = {
+            'retiro': 'Retiro',
+            'inasistencia': 'Inasistencia',
+            'sancion': 'Sanción'
+        }
+        
+        equipo_ganador = obj.equipo_ganador_default.nombre if obj.equipo_ganador_default else "No especificado"
+        motivo = motivos.get(obj.victoria_por_default, obj.victoria_por_default)
+        
+        return format_html(
+            '<span style="color: #FF5733; font-weight: bold;">{}: {}</span>',
+            motivo,
+            equipo_ganador
+        )
+    
+    mostrar_victoria_default.short_description = "Victoria por default"
 
 
 @admin.register(Gol)
