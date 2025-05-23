@@ -3,12 +3,11 @@ Modelos financieros para el sistema GoolStar.
 Incluye transacciones de pago y pagos a árbitros.
 """
 
-from django.db import models
-from django.core.validators import MinValueValidator
-from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
+from django.core.validators import MinValueValidator
+from django.db import models
 from django.utils import timezone
-from decimal import Decimal
+from django.utils.translation import gettext_lazy as _
 
 from .participantes import Equipo, Arbitro
 
@@ -24,20 +23,50 @@ class TipoTransaccion(models.TextChoices):
     DEVOLUCION = 'devolucion', _('Devolución')
 
 
+# En api/models/financiero.py - Añadir primero el enum
+class MetodoPago(models.TextChoices):
+    EFECTIVO = 'efectivo', _('Efectivo')
+    TRANSFERENCIA = 'transferencia', _('Transferencia Bancaria')
+    DEPOSITO = 'deposito', _('Depósito Bancario')
+    TARJETA = 'tarjeta', _('Tarjeta de Crédito/Débito')
+    OTRO = 'otro', _('Otro')
+
+
+# En la clase TransaccionPago, añadir el campo
+
+
 class TransaccionPago(models.Model):
     """Registro detallado de todas las transacciones de pago de los equipos"""
     equipo = models.ForeignKey(Equipo, on_delete=models.PROTECT, related_name='transacciones')
-    partido = models.ForeignKey('api.Partido', on_delete=models.SET_NULL, related_name='transacciones_pago', blank=True, null=True)
+    partido = models.ForeignKey('api.Partido', on_delete=models.SET_NULL, related_name='transacciones_pago', blank=True,
+                                null=True)
     fecha = models.DateTimeField(auto_now_add=True)
     tipo = models.CharField(max_length=20, choices=TipoTransaccion.choices)
     monto = models.DecimalField(max_digits=8, decimal_places=2, validators=[MinValueValidator(0)])
-    es_ingreso = models.BooleanField(default=False, help_text="True si es un ingreso para el torneo, False si es un gasto")
+    es_ingreso = models.BooleanField(default=False,
+                                     help_text="True si es un ingreso para el torneo, False si es un gasto")
     concepto = models.CharField(max_length=100)
-    
+    metodo_pago = models.CharField(
+        max_length=20,
+        choices=MetodoPago.choices,
+        default=MetodoPago.EFECTIVO,
+        blank=True
+    )
+    fecha_real_transaccion = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Fecha real de la transacción"
+    )
+    # En TransaccionPago, añadir el campo
+    referencia_pago = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Número de referencia de transferencia, recibo, etc."
+    )
     # Campos para transacciones específicas
     tarjeta = models.ForeignKey('api.Tarjeta', on_delete=models.SET_NULL, blank=True, null=True)
     jugador = models.ForeignKey('api.Jugador', on_delete=models.SET_NULL, blank=True, null=True)
-    
+
     # Información adicional
     observaciones = models.TextField(blank=True)
     creado_automaticamente = models.BooleanField(default=False)
@@ -81,7 +110,7 @@ class PagoArbitro(models.Model):
         # Si se marca como pagado y no tiene fecha de pago, establecer la fecha actual
         if self.pagado and not self.fecha_pago:
             self.fecha_pago = timezone.now()
-            
+
         # Actualizar el estado de pago en el partido
         if self.pagado:
             if self.equipo == self.partido.equipo_1:
@@ -89,7 +118,7 @@ class PagoArbitro(models.Model):
             elif self.equipo == self.partido.equipo_2:
                 self.partido.equipo_2_pago_arbitro = True
             self.partido.save()
-            
+
         super().save(*args, **kwargs)
 
     class Meta:

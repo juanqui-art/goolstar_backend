@@ -29,7 +29,7 @@ class Dirigente(models.Model):
 
 class Equipo(models.Model):
     """Equipos participantes en el torneo"""
-    
+
     class Grupo(models.TextChoices):
         """Grupos para la fase de grupos del torneo"""
         GRUPO_A = 'A', _('Grupo A')
@@ -55,14 +55,14 @@ class Equipo(models.Model):
     activo = models.BooleanField(default=True)
     estado = models.CharField(max_length=15, choices=Estado.choices, default=Estado.ACTIVO)
     fecha_retiro = models.DateTimeField(null=True, blank=True)
-    
+
     # Campos para fase de grupos
     grupo = models.CharField(max_length=1, choices=Grupo.choices, blank=True)
-    
+
     # Campos para control de inasistencias
     inasistencias = models.PositiveSmallIntegerField(default=0)
     excluido_por_inasistencias = models.BooleanField(default=False)
-    
+
     # Campos para eliminación directa
     clasificado_fase_grupos = models.BooleanField(default=False)
     fase_actual = models.CharField(max_length=20, blank=True)
@@ -70,7 +70,7 @@ class Equipo(models.Model):
 
     def __str__(self):
         return self.nombre
-    
+
     @property
     def deuda_total(self):
         """Calcula la deuda total del equipo usando transacciones"""
@@ -78,7 +78,7 @@ class Equipo(models.Model):
         total_inscripcion = self.get_total_inscripcion()
         abonos = TransaccionPago.objects.filter(equipo=self, tipo='abono_inscripcion').aggregate(total=Sum('monto'))['total'] or 0
         return total_inscripcion - abonos
-    
+
     @property
     def calcular_saldo_total(self):
         """Calcula el saldo total del equipo (positivo = a favor, negativo = debe)"""
@@ -86,81 +86,81 @@ class Equipo(models.Model):
         return TransaccionPago.objects.filter(equipo=self).aggregate(
             saldo=Sum('monto', filter=models.Q(es_ingreso=True)) - Sum('monto', filter=models.Q(es_ingreso=False))
         )['saldo'] or Decimal('0.00')
-    
+
     def calcular_saldo_para_acta(self, hasta_partido=None):
         """Calcula el saldo anterior para mostrar en el acta de un partido específico"""
         from .financiero import TransaccionPago
         query = TransaccionPago.objects.filter(equipo=self)
-        
+
         if hasta_partido:
             query = query.filter(fecha__lt=hasta_partido.fecha)
-            
+
         return query.aggregate(
             saldo=Sum('monto', filter=models.Q(es_ingreso=True)) - Sum('monto', filter=models.Q(es_ingreso=False))
         )['saldo'] or Decimal('0.00')
-    
+
     def get_total_inscripcion(self):
         """Calcula el total de inscripción incluyendo multas pendientes"""
         costo_base = self.categoria.costo_inscripcion or Decimal('0.00')
         multas_pendientes = self.get_deuda_multas_pendientes()
         return costo_base + multas_pendientes
-    
+
     def get_deuda_multas_pendientes(self):
         """Calcula deuda por multas de tarjetas pendientes de pago"""
         from .competicion import Tarjeta
         from decimal import Decimal
-        
+
         # Verificar si la categoría existe
         if not self.categoria:
             return Decimal('0.00')
-            
+
         # Verificar si las multas están definidas en la categoría
         multa_amarilla = getattr(self.categoria, 'multa_amarilla', Decimal('0.00'))
         multa_roja = getattr(self.categoria, 'multa_roja', Decimal('0.00'))
-        
+
         # Contar tarjetas no pagadas
         amarillas = Tarjeta.objects.filter(
             jugador__equipo=self, tipo='AMARILLA', pagada=False).count()
         rojas = Tarjeta.objects.filter(
             jugador__equipo=self, tipo='ROJA', pagada=False).count()
-        
+
         return (amarillas * multa_amarilla) + (rojas * multa_roja)
-    
+
     def get_tarjetas_no_pagadas(self, tipo=None):
         """Obtiene tarjetas no pagadas del equipo"""
         from .competicion import Tarjeta
         query = Tarjeta.objects.filter(jugador__equipo=self, pagada=False)
-        
+
         if tipo:
             query = query.filter(tipo=tipo)
-            
+
         return query
-    
-    def registrar_abono(self, monto, concepto="Abono a inscripción", observaciones=""):
-        """Registra un abono del equipo de manera atómica"""
-        from .financiero import TransaccionPago, TipoTransaccion
-        
-        # Validar que el monto sea positivo
+
+    def registrar_abono(self, monto, concepto="Abono a inscripción",
+                        observaciones="", metodo_pago="efectivo", fecha_real=None):
+        from .financiero import TransaccionPago, TipoTransaccion, MetodoPago
+
         if monto <= 0:
             raise ValueError("El monto debe ser mayor que cero")
-        
-        # Usar transaction.atomic para garantizar que toda la operación sea atómica
+
+        # Asegurarse que fecha_real tenga zona horaria si se proporciona
+        if fecha_real and timezone.is_naive(fecha_real):
+            fecha_real = timezone.make_aware(fecha_real)
+
         with transaction.atomic():
-            # Crear la transacción de pago
             transaccion = TransaccionPago.objects.create(
                 equipo=self,
                 tipo=TipoTransaccion.ABONO_INSCRIPCION,
                 monto=monto,
                 es_ingreso=True,
                 concepto=concepto,
-                observaciones=observaciones
+                observaciones=observaciones,
+                metodo_pago=metodo_pago,
+                fecha_real_transaccion=fecha_real
             )
-            
-            # Si en el futuro necesitas actualizar otros registros relacionados con este abono,
-            # hazlo aquí dentro del contexto de la transacción
-        
+
         return transaccion
-    
+
     def verificar_suspension_por_inasistencias(self):
         """Verifica si el equipo debe ser excluido por inasistencias"""
         if self.inasistencias >= self.categoria.limite_inasistencias and not self.excluido_por_inasistencias:
@@ -169,31 +169,31 @@ class Equipo(models.Model):
             self.save()
             return True
         return False
-    
+
     def clasificar_a_eliminacion(self):
         """Marca el equipo como clasificado a eliminación directa"""
         self.clasificado_fase_grupos = True
         self.fase_actual = 'eliminatorias'
         self.save()
-    
+
     def eliminar_en_fase(self, fase):
         """Marca el equipo como eliminado en una fase específica"""
         self.eliminado_en_fase = fase
         self.fase_actual = ''
         self.save()
-    
+
     def get_historial_pagos(self):
         """Obtiene el historial completo de pagos del equipo"""
         from .financiero import TransaccionPago
         return TransaccionPago.objects.filter(equipo=self).order_by('-fecha')
-    
+
     def get_balance_por_tipo(self):
         """Obtiene el balance desglosado por tipo de transacción"""
         from .financiero import TransaccionPago
         return TransaccionPago.objects.filter(equipo=self).values('tipo').annotate(
             total=Sum('monto', filter=models.Q(es_ingreso=True)) - Sum('monto', filter=models.Q(es_ingreso=False))
         )
-    
+
     class Meta:
         unique_together = ['nombre', 'categoria', 'torneo']
         verbose_name = "Equipo"
@@ -213,7 +213,7 @@ class Jugador(models.Model):
     posicion = models.CharField(max_length=50, blank=True, null=True)
     nivel = models.IntegerField(choices=Nivel.choices, default=Nivel.MEDIO, null=True, blank=True)
     foto = models.ImageField(upload_to='fotos_jugadores/', blank=True, null=True)
-    
+
     # Campos para control de suspensiones
     suspendido = models.BooleanField(default=False)
     partidos_suspension_restantes = models.PositiveSmallIntegerField(default=0)
@@ -223,46 +223,46 @@ class Jugador(models.Model):
         if self.segundo_apellido:
             return f"{self.primer_apellido} {self.segundo_apellido} {self.primer_nombre}"
         return f"{self.primer_apellido} {self.primer_nombre}"
-    
+
     @property
     def nombre_completo(self):
         nombres = f"{self.primer_nombre}"
         if self.segundo_nombre:
             nombres += f" {self.segundo_nombre}"
         return f"{nombres} {self.primer_apellido} {self.segundo_apellido or ''}".strip()
-    
+
     def get_amarillas_acumuladas(self):
         """Cuenta amarillas acumuladas sin suspensión cumplida"""
         from .competicion import Tarjeta
         return Tarjeta.objects.filter(jugador=self, tipo='AMARILLA', suspension_cumplida=False).count()
-    
+
     def verificar_suspension_por_amarillas(self):
         """Verifica si el jugador debe ser suspendido por amarillas"""
         from .competicion import Tarjeta
         amarillas = self.get_amarillas_acumuladas()
         limite = self.equipo.categoria.limite_amarillas_suspension
-        
+
         if amarillas >= limite:
             # Marcar al jugador como suspendido
             self.suspendido = True
             self.partidos_suspension_restantes = 1
             self.save()
-            
+
             # Marcar las tarjetas como procesadas para suspensión
             Tarjeta.objects.filter(
-                jugador=self, 
-                tipo='AMARILLA', 
+                jugador=self,
+                tipo='AMARILLA',
                 suspension_cumplida=False
             ).update(suspension_cumplida=True)
-            
+
             return True
         return False
-    
+
     @property
     def puede_jugar(self):
         """Verifica si el jugador puede participar (no suspendido)"""
         return not self.suspendido
-    
+
     class Meta:
         unique_together = [
             ['cedula', 'equipo'],
@@ -298,28 +298,28 @@ class Arbitro(models.Model):
 
     def __str__(self):
         return f"{self.apellidos}, {self.nombres}"
-    
+
     @property
     def nombre_completo(self):
         return f"{self.nombres} {self.apellidos}"
-    
+
     @property
     def partidos_arbitrados(self):
         from .competicion import Partido
         return Partido.objects.filter(arbitro=self).count()
-    
+
     @property
     def total_cobrado(self):
         from .financiero import PagoArbitro
         return PagoArbitro.objects.filter(arbitro=self, pagado=True).aggregate(
             total=Sum('monto'))['total'] or Decimal('0.00')
-    
+
     @property
     def total_por_cobrar(self):
         from .financiero import PagoArbitro
         return PagoArbitro.objects.filter(arbitro=self, pagado=False).aggregate(
             total=Sum('monto'))['total'] or Decimal('0.00')
-    
+
     class Meta:
         verbose_name = "Árbitro"
         verbose_name_plural = "Árbitros"
