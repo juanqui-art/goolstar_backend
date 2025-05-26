@@ -157,7 +157,7 @@ class EquipoAdmin(admin.ModelAdmin):
     search_fields = ('nombre',)
     list_select_related = ('categoria', 'torneo')  # Optimización para evitar N+1 queries
     inlines = [JugadorInline]
-    actions = ['descargar_lista_jugadores_pdf', 'descargar_historial_partidos_pdf', 'marcar_como_retirados']
+    actions = ['descargar_lista_jugadores_pdf', 'descargar_historial_partidos_pdf', 'marcar_como_retirados', 'descargar_balance_financiero_pdf']
 
     fieldsets = (
         ('Información básica', {
@@ -289,6 +289,78 @@ class EquipoAdmin(admin.ModelAdmin):
         self.message_user(request, "Error al generar el PDF", level='ERROR')
     
     descargar_historial_partidos_pdf.short_description = "Descargar historial de partidos en PDF fase grupos"
+
+    def descargar_balance_financiero_pdf(self, request, queryset):
+        """Genera un PDF con el balance financiero del equipo, incluyendo deudas por inscripción y tarjetas"""
+        if len(queryset) != 1:
+            self.message_user(request, "Por favor seleccione solo un equipo a la vez para descargar el balance financiero", level='WARNING')
+            return
+
+        from .models.financiero import TransaccionPago
+        from .models.competicion import Tarjeta
+        from decimal import Decimal
+            
+        equipo = queryset.first()
+        
+        # Obtener datos de inscripción
+        costo_inscripcion = equipo.categoria.costo_inscripcion or Decimal('0.00')
+        abonos_inscripcion = TransaccionPago.objects.filter(
+            equipo=equipo, 
+            tipo='abono_inscripcion'
+        ).aggregate(total=models.Sum('monto'))['total'] or Decimal('0.00')
+        saldo_inscripcion = costo_inscripcion - abonos_inscripcion
+        
+        # Obtener tarjetas pendientes de pago
+        tarjetas_amarillas = Tarjeta.objects.filter(
+            jugador__equipo=equipo, 
+            tipo='AMARILLA', 
+            pagada=False
+        ).select_related('jugador', 'partido')
+        
+        tarjetas_rojas = Tarjeta.objects.filter(
+            jugador__equipo=equipo, 
+            tipo='ROJA', 
+            pagada=False
+        ).select_related('jugador', 'partido')
+        
+        # Calcular totales
+        total_amarillas = sum(t.monto_multa for t in tarjetas_amarillas)
+        total_rojas = sum(t.monto_multa for t in tarjetas_rojas)
+        deuda_total = saldo_inscripcion + total_amarillas + total_rojas
+        
+        # Preparar contexto para la plantilla
+        context = {
+            'equipo': equipo,
+            'fecha_actual': timezone.now(),
+            'costo_inscripcion': costo_inscripcion,
+            'abonos_inscripcion': abonos_inscripcion,
+            'saldo_inscripcion': saldo_inscripcion,
+            'tarjetas_amarillas': tarjetas_amarillas,
+            'tarjetas_rojas': tarjetas_rojas,
+            'total_amarillas': total_amarillas,
+            'total_rojas': total_rojas,
+            'deuda_total': deuda_total
+        }
+        
+        # Renderizar plantilla a HTML
+        template = get_template('admin/balance_equipo_pdf.html')
+        html = template.render(context)
+        
+        # Crear PDF a partir del HTML
+        result = BytesIO()
+        pdf = pisa.pisaDocument(BytesIO(html.encode("UTF-8")), result)
+        
+        if not pdf.err:
+            # Configurar respuesta HTTP con PDF
+            filename = f"Balance_Financiero_{equipo.nombre}_{timezone.now().strftime('%Y%m%d')}.pdf"
+            response = HttpResponse(result.getvalue(), content_type='application/pdf')
+            response['Content-Disposition'] = f'attachment; filename="{filename}"'
+            return response
+        
+        self.message_user(request, "Error al generar el PDF del balance financiero", level='ERROR')
+        return None
+    
+    descargar_balance_financiero_pdf.short_description = "Descargar balance financiero en PDF"
 
 
 @admin.register(Jugador)

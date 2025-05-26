@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Balance Financiero - {{ equipo.nombre }}</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.4;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .logo {
+            max-width: 100px;
+            max-height: 100px;
+        }
+        h1 {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 15px 0 5px 0;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 15px;
+        }
+        th, td {
+            border: 1px solid #ddd;
+            padding: 6px;
+            text-align: left;
+        }
+        th {
+            background-color: #f2f2f2;
+            font-weight: bold;
+        }
+        .total-row {
+            font-weight: bold;
+            background-color: #eaeaea;
+        }
+        .footer {
+            margin-top: 20px;
+            text-align: center;
+            font-size: 10px;
+            color: #666;
+        }
+        .value-column {
+            text-align: right;
+        }
+        .positive {
+            color: green;
+        }
+        .negative {
+            color: red;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>GOOLSTAR - BALANCE FINANCIERO</h1>
+        <h2>{{ equipo.nombre }}</h2>
+        <p>Categoría: {{ equipo.categoria.nombre }}</p>
+        <p>Torneo: {{ equipo.torneo.nombre }}</p>
+        <p>Fecha del reporte: {{ fecha_actual|date:"d/m/Y" }}</p>
+    </div>
+
+    <h2>Inscripción</h2>
+    <table>
+        <tr>
+            <th>Concepto</th>
+            <th class="value-column">Valor</th>
+        </tr>
+        <tr>
+            <td>Costo de inscripción</td>
+            <td class="value-column">${{ equipo.categoria.costo_inscripcion|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td>Abonos realizados</td>
+            <td class="value-column">${{ abonos_inscripcion|floatformat:2 }}</td>
+        </tr>
+        <tr class="total-row">
+            <td>Saldo pendiente inscripción</td>
+            <td class="value-column {% if saldo_inscripcion > 0 %}negative{% endif %}">${{ saldo_inscripcion|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <h2>Multas por Tarjetas</h2>
+    <table>
+        <tr>
+            <th>Tipo</th>
+            <th>Jugador</th>
+            <th>Partido</th>
+            <th>Fecha</th>
+            <th class="value-column">Valor</th>
+        </tr>
+        {% if tarjetas_amarillas %}
+            {% for tarjeta in tarjetas_amarillas %}
+            <tr>
+                <td>Amarilla</td>
+                <td>{{ tarjeta.jugador.primer_nombre }} {{ tarjeta.jugador.primer_apellido }}</td>
+                <td>{{ tarjeta.partido }}</td>
+                <td>{{ tarjeta.partido.fecha|date:"d/m/Y" }}</td>
+                <td class="value-column">${{ tarjeta.monto_multa|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="5">No hay tarjetas amarillas pendientes de pago</td>
+            </tr>
+        {% endif %}
+        <tr class="total-row">
+            <td colspan="4">Total tarjetas amarillas</td>
+            <td class="value-column {% if total_amarillas > 0 %}negative{% endif %}">${{ total_amarillas|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <table>
+        <tr>
+            <th>Tipo</th>
+            <th>Jugador</th>
+            <th>Partido</th>
+            <th>Fecha</th>
+            <th class="value-column">Valor</th>
+        </tr>
+        {% if tarjetas_rojas %}
+            {% for tarjeta in tarjetas_rojas %}
+            <tr>
+                <td>Roja</td>
+                <td>{{ tarjeta.jugador.primer_nombre }} {{ tarjeta.jugador.primer_apellido }}</td>
+                <td>{{ tarjeta.partido }}</td>
+                <td>{{ tarjeta.partido.fecha|date:"d/m/Y" }}</td>
+                <td class="value-column">${{ tarjeta.monto_multa|floatformat:2 }}</td>
+            </tr>
+            {% endfor %}
+        {% else %}
+            <tr>
+                <td colspan="5">No hay tarjetas rojas pendientes de pago</td>
+            </tr>
+        {% endif %}
+        <tr class="total-row">
+            <td colspan="4">Total tarjetas rojas</td>
+            <td class="value-column {% if total_rojas > 0 %}negative{% endif %}">${{ total_rojas|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <h2>Resumen Total</h2>
+    <table>
+        <tr>
+            <th>Concepto</th>
+            <th class="value-column">Valor</th>
+        </tr>
+        <tr>
+            <td>Saldo pendiente inscripción</td>
+            <td class="value-column {% if saldo_inscripcion > 0 %}negative{% endif %}">${{ saldo_inscripcion|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td>Multas tarjetas amarillas</td>
+            <td class="value-column {% if total_amarillas > 0 %}negative{% endif %}">${{ total_amarillas|floatformat:2 }}</td>
+        </tr>
+        <tr>
+            <td>Multas tarjetas rojas</td>
+            <td class="value-column {% if total_rojas > 0 %}negative{% endif %}">${{ total_rojas|floatformat:2 }}</td>
+        </tr>
+        <tr class="total-row">
+            <td>DEUDA TOTAL</td>
+            <td class="value-column {% if deuda_total > 0 %}negative{% endif %}">${{ deuda_total|floatformat:2 }}</td>
+        </tr>
+    </table>
+
+    <div class="footer">
+        <p>Este documento es un informe financiero generado por el sistema GoolStar.</p>
+        <p>Fecha de generación: {{ fecha_actual|date:"d/m/Y H:i:s" }}</p>
+    </div>
+</body>
+</html>
