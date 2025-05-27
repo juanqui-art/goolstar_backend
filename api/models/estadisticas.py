@@ -6,7 +6,7 @@ Incluye estadísticas de equipos, llaves eliminatorias y eventos del torneo.
 from django.db import models
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
-from django.db.models import Q, Sum, Count
+from django.db.models import Q, Sum, Count, Case, When, IntegerField, F
 
 from .base import Torneo, FaseEliminatoria
 from .participantes import Equipo
@@ -36,93 +36,94 @@ class EstadisticaEquipo(models.Model):
     def actualizar_estadisticas(self):
         """Actualiza las estadísticas basándose en los partidos jugados"""
         from .competicion import Partido, Tarjeta
-        from django.db.models import Sum, Count, Case, When, IntegerField, Q
         
-        # Reiniciar estadísticas
-        self.partidos_jugados = 0
-        self.partidos_ganados = 0
-        self.partidos_empatados = 0
-        self.partidos_perdidos = 0
-        self.goles_favor = 0
-        self.goles_contra = 0
+        # Subconsulta para tarjetas amarillas
+        amarillas_subquery = Tarjeta.objects.filter(
+            jugador__equipo=self.equipo,
+            partido__torneo=self.torneo,
+            tipo='AMARILLA'
+        ).aggregate(total=Count('id'))['total'] or 0
         
-        # Obtener estadísticas agregadas para partidos como local
-        estadisticas_local = Partido.objects.filter(
-            equipo_1=self.equipo,
+        # Subconsulta para tarjetas rojas  
+        rojas_subquery = Tarjeta.objects.filter(
+            jugador__equipo=self.equipo,
+            partido__torneo=self.torneo,
+            tipo='ROJA'
+        ).aggregate(total=Count('id'))['total'] or 0
+        
+        # CONSULTA ÚNICA que maneja local y visitante con CASE/WHEN
+        estadisticas = Partido.objects.filter(
+            Q(equipo_1=self.equipo) | Q(equipo_2=self.equipo),
             torneo=self.torneo,
             completado=True
         ).aggregate(
-            partidos=Count('id'),
-            goles_favor=Sum('goles_equipo_1'),
-            goles_contra=Sum('goles_equipo_2'),
-            victorias=Count(Case(
-                When(Q(goles_equipo_1__gt=models.F('goles_equipo_2')), then=1),
-                output_field=IntegerField()
-            )),
-            empates=Count(Case(
-                When(Q(goles_equipo_1=models.F('goles_equipo_2')), then=1),
-                output_field=IntegerField()
-            )),
-            derrotas=Count(Case(
-                When(Q(goles_equipo_1__lt=models.F('goles_equipo_2')), then=1),
-                output_field=IntegerField()
-            ))
+            # Partidos totales
+            partidos_jugados=Count('id'),
+            
+            # Goles a favor (CASE para determinar si es local o visitante)
+            goles_favor=Sum(
+                Case(
+                    When(equipo_1=self.equipo, then='goles_equipo_1'),
+                    When(equipo_2=self.equipo, then='goles_equipo_2'),
+                    default=0,
+                    output_field=IntegerField()
+                )
+            ),
+            
+            # Goles en contra
+            goles_contra=Sum(
+                Case(
+                    When(equipo_1=self.equipo, then='goles_equipo_2'),
+                    When(equipo_2=self.equipo, then='goles_equipo_1'),
+                    default=0,
+                    output_field=IntegerField()
+                )
+            ),
+            
+            # Victorias
+            partidos_ganados=Count(
+                Case(
+                    When(
+                        Q(equipo_1=self.equipo) & Q(goles_equipo_1__gt=F('goles_equipo_2')),
+                        then=1
+                    ),
+                    When(
+                        Q(equipo_2=self.equipo) & Q(goles_equipo_2__gt=F('goles_equipo_1')),
+                        then=1
+                    ),
+                    output_field=IntegerField()
+                )
+            ),
+            
+            # Empates
+            partidos_empatados=Count(
+                Case(
+                    When(
+                        (Q(equipo_1=self.equipo) | Q(equipo_2=self.equipo)) & 
+                        Q(goles_equipo_1=F('goles_equipo_2')),
+                        then=1
+                    ),
+                    output_field=IntegerField()
+                )
+            )
         )
         
-        # Obtener estadísticas agregadas para partidos como visitante
-        estadisticas_visitante = Partido.objects.filter(
-            equipo_2=self.equipo,
-            torneo=self.torneo,
-            completado=True
-        ).aggregate(
-            partidos=Count('id'),
-            goles_favor=Sum('goles_equipo_2'),
-            goles_contra=Sum('goles_equipo_1'),
-            victorias=Count(Case(
-                When(Q(goles_equipo_2__gt=models.F('goles_equipo_1')), then=1),
-                output_field=IntegerField()
-            )),
-            empates=Count(Case(
-                When(Q(goles_equipo_2=models.F('goles_equipo_1')), then=1),
-                output_field=IntegerField()
-            )),
-            derrotas=Count(Case(
-                When(Q(goles_equipo_2__lt=models.F('goles_equipo_1')), then=1),
-                output_field=IntegerField()
-            ))
-        )
+        # Asignar valores con manejo seguro de None
+        self.partidos_jugados = estadisticas['partidos_jugados'] or 0
+        self.goles_favor = estadisticas['goles_favor'] or 0
+        self.goles_contra = estadisticas['goles_contra'] or 0
+        self.partidos_ganados = estadisticas['partidos_ganados'] or 0
+        self.partidos_empatados = estadisticas['partidos_empatados'] or 0
+        self.partidos_perdidos = self.partidos_jugados - self.partidos_ganados - self.partidos_empatados
         
-        # Sumar estadísticas de local y visitante, con manejo seguro para valores nulos
-        self.partidos_jugados = (estadisticas_local['partidos'] or 0) + (estadisticas_visitante['partidos'] or 0)
-        self.goles_favor = (estadisticas_local['goles_favor'] or 0) + (estadisticas_visitante['goles_favor'] or 0)
-        self.goles_contra = (estadisticas_local['goles_contra'] or 0) + (estadisticas_visitante['goles_contra'] or 0)
-        self.partidos_ganados = (estadisticas_local['victorias'] or 0) + (estadisticas_visitante['victorias'] or 0)
-        self.partidos_empatados = (estadisticas_local['empates'] or 0) + (estadisticas_visitante['empates'] or 0)
-        self.partidos_perdidos = (estadisticas_local['derrotas'] or 0) + (estadisticas_visitante['derrotas'] or 0)
-        
-        # Calcular diferencia de goles y puntos
+        # Calcular campos derivados
         self.diferencia_goles = self.goles_favor - self.goles_contra
         self.puntos = (self.partidos_ganados * 3) + self.partidos_empatados
         
-        # Actualizar tarjetas con una sola consulta agregada por tipo
-        tarjetas_stats = Tarjeta.objects.filter(
-            jugador__equipo=self.equipo,
-            partido__torneo=self.torneo
-        ).values('tipo').annotate(
-            total=Count('id')
-        )
+        # Asignar tarjetas (ya calculadas)
+        self.tarjetas_amarillas = amarillas_subquery
+        self.tarjetas_rojas = rojas_subquery
         
-        # Inicializar contadores de tarjetas
-        self.tarjetas_amarillas = 0
-        self.tarjetas_rojas = 0
-        
-        # Actualizar contadores según los resultados de la consulta agregada
-        for stat in tarjetas_stats:
-            if stat['tipo'] == 'AMARILLA':
-                self.tarjetas_amarillas = stat['total']
-            elif stat['tipo'] == 'ROJA':
-                self.tarjetas_rojas = stat['total']
-
         self.save()
 
     class Meta:
