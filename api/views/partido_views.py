@@ -23,7 +23,7 @@ class PartidoViewSet(viewsets.ModelViewSet):
     Un partido se juega entre dos equipos, pertenece a una jornada y tiene registros
     asociados como goles y tarjetas.
     """
-    queryset = Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo')
+    queryset = Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').order_by('-fecha', 'id')
     serializer_class = PartidoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ['fecha']
