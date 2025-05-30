@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from drf_spectacular.utils import extend_schema_field
 from .models import Categoria, Equipo, Jugador, Jornada, Partido, Gol, Tarjeta
 from .models.base import Torneo
 from .models.estadisticas import EstadisticaEquipo
@@ -23,6 +24,7 @@ class JugadorSerializer(serializers.ModelSerializer):
         model = Jugador
         fields = '__all__'
     
+    @extend_schema_field(serializers.CharField())
     def get_nombre_completo(self, obj):
         nombres = f"{obj.primer_nombre} {obj.segundo_nombre or ''}".strip()
         apellidos = f"{obj.primer_apellido} {obj.segundo_apellido or ''}".strip()
@@ -46,9 +48,20 @@ class GolSerializer(serializers.ModelSerializer):
     jugador_nombre = serializers.ReadOnlyField(source='jugador.__str__')
     partido_descripcion = serializers.ReadOnlyField(source='partido.__str__')
     
+    # Campos optimizados para reducir consultas adicionales
+    equipo_nombre = serializers.ReadOnlyField(source='jugador.equipo.nombre')
+    torneo_nombre = serializers.ReadOnlyField(source='partido.torneo.nombre')
+    fecha_partido = serializers.SerializerMethodField()
+    
     class Meta:
         model = Gol
         fields = '__all__'
+        
+    def get_fecha_partido(self, obj):
+        """Retorna la fecha del partido formateada"""
+        if hasattr(obj, 'partido') and obj.partido and hasattr(obj.partido, 'fecha'):
+            return obj.partido.fecha.strftime('%d/%m/%Y %H:%M')
+        return None
 
 class TarjetaSerializer(serializers.ModelSerializer):
     jugador_nombre = serializers.ReadOnlyField(source='jugador.__str__')
@@ -87,6 +100,7 @@ class TorneoSerializer(serializers.ModelSerializer):
         model = Torneo
         fields = '__all__'
     
+    @extend_schema_field(serializers.IntegerField())
     def get_total_equipos(self, obj):
         return obj.equipos.filter(activo=True).count()
     
@@ -108,15 +122,19 @@ class TorneoDetalleSerializer(serializers.ModelSerializer):
         model = Torneo
         fields = '__all__'
     
+    @extend_schema_field(serializers.IntegerField())
     def get_total_equipos(self, obj):
         return obj.equipos.filter(activo=True).count()
     
+    @extend_schema_field(serializers.IntegerField())
     def get_total_partidos(self, obj):
         return obj.partidos.count()
     
+    @extend_schema_field(serializers.IntegerField())
     def get_partidos_jugados(self, obj):
         return obj.partidos.filter(completado=True).count()
     
+    @extend_schema_field(serializers.IntegerField())
     def get_partidos_pendientes(self, obj):
         return obj.partidos.filter(completado=False).count()
 
@@ -136,3 +154,7 @@ class EstadisticaEquipoSerializer(serializers.ModelSerializer):
 class TablaposicionesSerializer(serializers.Serializer):
     grupo = serializers.CharField(max_length=20, required=False)
     equipos = EstadisticaEquipoSerializer(many=True, read_only=True)
+    
+    class Meta:
+        # Esto ayuda a drf-spectacular a generar mejores tipos
+        ref_name = 'TablaPosiciones'
