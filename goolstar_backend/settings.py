@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 from pathlib import Path
+
 from dotenv import load_dotenv
 
 # Cargar variables de entorno
@@ -24,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # SECURITY WARNING: keep the secret key used in production secret!
 import os
+
 SECRET_KEY = os.environ.get('SECRET_KEY')
 if SECRET_KEY is None:
     if os.environ.get('PRODUCTION', 'False') == 'True':
@@ -60,6 +62,7 @@ INSTALLED_APPS = [
     'drf_yasg',  # Para la documentación de la API
     'rest_framework_simplejwt',  # Para autenticación con JWT
     'rest_framework_simplejwt.token_blacklist',  # Añadido para permitir blacklist de tokens
+    'drf_spectacular',
     # Apps locales
     'api',
 ]
@@ -81,7 +84,7 @@ MIDDLEWARE = [
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',  # Para desarrollo con Next.js
     'https://goolstar-frontend.fly.dev',  # Para producción (ajusta según tu dominio)
-    'https://goolstar-backend.fly.dev',   # Dominio de la API en Fly.io
+    'https://goolstar-backend.fly.dev',  # Dominio de la API en Fly.io
 ]
 
 # Configuración de seguridad para producción
@@ -140,7 +143,7 @@ if 'DATABASE_URL' in os.environ:
             'CONN_MAX_AGE': 600,
         }
     }
-    
+
     # También intentamos parsear DATABASE_URL si está presente
     db_from_env = dj_database_url.config(conn_max_age=600)
     if db_from_env:
@@ -336,7 +339,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Django REST Framework
 REST_FRAMEWORK = {
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20,  # 20 elementos por página por defecto
+    'PAGE_SIZE': 30,
     'DEFAULT_FILTER_BACKENDS': [
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
@@ -346,16 +349,26 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.SessionAuthentication',
         'rest_framework.authentication.BasicAuthentication',
     ],
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
 }
-
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'GoolStar API',
+    'DESCRIPTION': 'API para gestión de competiciones deportivas',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+    # Configuraciones específicas para tu API
+    'COMPONENT_SPLIT_REQUEST': True,
+    'SORT_OPERATIONS': False,
+}
 # Simple JWT settings
 from datetime import timedelta
+
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(hours=1),  # Token de acceso válido por 1 hora
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),  # Token de refresco válido por 7 días
     'ROTATE_REFRESH_TOKENS': True,  # Genera un nuevo refresh token cuando se usa
     'BLACKLIST_AFTER_ROTATION': True,  # Agregado para permitir blacklist de tokens
-    
+
     'ALGORITHM': 'HS256',  # Algoritmo de firma (HMAC con SHA-256)
     'SIGNING_KEY': SECRET_KEY,  # Usa la clave secreta de Django para firmar
     'VERIFYING_KEY': None,
@@ -373,3 +386,6 @@ if 'test' in sys.argv:
             'NAME': ':memory:',
         }
     }
+
+# Deshabilitar redirección automática para barras diagonales finales
+APPEND_SLASH = True
