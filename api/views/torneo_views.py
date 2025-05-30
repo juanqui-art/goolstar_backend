@@ -7,6 +7,7 @@ from rest_framework import viewsets, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter, OpenApiExample
 
 from api.models import Torneo, Gol, Tarjeta, Jugador
 from api.models.estadisticas import EstadisticaEquipo
@@ -20,6 +21,32 @@ from api.utils.tz_logging import log_date_conversion
 
 logger = get_logger(__name__)
 
+@extend_schema_view(
+    list=extend_schema(
+        summary="Listar todos los torneos",
+        description="Retorna una lista paginada de todos los torneos en el sistema."
+    ),
+    retrieve=extend_schema(
+        summary="Obtener detalle de un torneo",
+        description="Retorna información detallada de un torneo específico."
+    ),
+    create=extend_schema(
+        summary="Crear un nuevo torneo",
+        description="Crea un nuevo torneo con los datos proporcionados."
+    ),
+    update=extend_schema(
+        summary="Actualizar un torneo completo",
+        description="Actualiza todos los campos de un torneo existente."
+    ),
+    partial_update=extend_schema(
+        summary="Actualizar parcialmente un torneo",
+        description="Actualiza solo los campos proporcionados de un torneo existente."
+    ),
+    destroy=extend_schema(
+        summary="Eliminar un torneo",
+        description="Elimina un torneo existente del sistema."
+    )
+)
 class TorneoViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar los Torneos.
@@ -50,6 +77,11 @@ class TorneoViewSet(viewsets.ModelViewSet):
         logger.info(f"Obteniendo detalle del torneo {kwargs.get('pk')} - Usuario: {request.user}")
         return super().retrieve(request, *args, **kwargs)
 
+    @extend_schema(
+        summary="Listar torneos activos",
+        description="Obtiene una lista de torneos que están actualmente en curso (fecha actual entre fecha_inicio y fecha_fin).",
+        responses={200: TorneoSerializer(many=True)}
+    )
     @log_api_request(logger)
     @action(detail=False, methods=['get'])
     def activos(self, request):
@@ -69,16 +101,42 @@ class TorneoViewSet(viewsets.ModelViewSet):
         today_datetime = date_to_datetime(today)
         log_date_conversion(today, today_datetime, logger)
         
+        # Crear query base con torneos marcados como activos
         queryset = Torneo.objects.filter(
-            fecha_inicio__lte=today_datetime,
-            fecha_fin__gte=today_datetime
-        ).select_related('categoria').order_by('fecha_inicio')
+            activo=True,  # Considerar el campo activo del modelo
+            fecha_inicio__lte=today_datetime
+        ).select_related('categoria')
         
-        serializer = self.get_serializer(queryset, many=True)
+        # Añadir condición para fecha_fin solo si queremos filtrar por ella
+        # Esto permite que torneos con fecha_fin=None también aparezcan
+        fecha_fin_filter = Q(fecha_fin__gte=today_datetime) | Q(fecha_fin__isnull=True)
+        queryset = queryset.filter(fecha_fin_filter).order_by('fecha_inicio')
+        
         logger.info(f"Torneos activos encontrados: {queryset.count()}")
+        serializer = self.get_serializer(queryset, many=True)
         
         return Response(serializer.data)
 
+    @extend_schema(
+        summary="Obtener tabla de posiciones",
+        description="Obtiene la tabla de posiciones actual del torneo, con estadísticas de cada equipo.",
+        parameters=[
+            OpenApiParameter(
+                name="grupo", 
+                description="Filtrar por grupo específico (A, B, C, etc.)", 
+                required=False, 
+                type=str
+            ),
+            OpenApiParameter(
+                name="actualizar", 
+                description="Si es 'true', fuerza la actualización de todas las estadísticas", 
+                required=False, 
+                type=bool,
+                default=False
+            ),
+        ],
+        responses={200: TablaposicionesSerializer}
+    )
     @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def tabla_posiciones(self, request, pk=None):
@@ -149,6 +207,11 @@ class TorneoViewSet(viewsets.ModelViewSet):
         }
         return Response(response_data)
     
+    @extend_schema(
+        summary="Obtener estadísticas generales del torneo",
+        description="Obtiene estadísticas detalladas del torneo, incluyendo total de equipos, partidos, goles, tarjetas y más.",
+        responses={200: None}
+    )
     @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def estadisticas(self, request, pk=None):
@@ -204,6 +267,20 @@ class TorneoViewSet(viewsets.ModelViewSet):
         
         return Response(response_data)
         
+    @extend_schema(
+        summary="Obtener jugadores destacados del torneo",
+        description="Obtiene lista de goleadores, jugadores con tarjetas amarillas y jugadores con tarjetas rojas.",
+        parameters=[
+            OpenApiParameter(
+                name="limite", 
+                description="Número máximo de jugadores a mostrar en cada categoría (por defecto: 5)", 
+                required=False, 
+                type=int,
+                default=5
+            ),
+        ],
+        responses={200: None}
+    )
     @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def jugadores_destacados(self, request, pk=None):
