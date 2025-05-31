@@ -1,12 +1,42 @@
+# Paquetes principales
 Django==5.2
 djangorestframework==3.15.2
-django-cors-headers==4.3.1
-Pillow==10.3.0
-gunicorn==23.0.0
-whitenoise==6.6.0
+
+# Base de datos
 psycopg2-binary==2.9.9
 dj-database-url==2.1.0
-python-dotenv==1.0.0
-drf-yasg==1.21.7
+
+# Autenticación y seguridad
 djangorestframework-simplejwt==5.4.0
+PyJWT==2.9.0
+python-dotenv==1.0.0
+
+# CORS y seguridad HTTP
+django-cors-headers==4.3.1
+whitenoise==6.6.0
+
+# Documentación de API
+drf-yasg==1.21.7
+uritemplate==4.1.1
+drf-spectacular==0.28.0
+
+# Manejo de imágenes, PDFs y archivos estáticos
+Pillow==10.3.0
 xhtml2pdf==0.2.17
+reportlab==4.4.1
+
+# Servidor WSGI
+gunicorn==23.0.0
+
+# Dependencias de Django (se instalarán automáticamente)
+asgiref==3.8.1
+sqlparse==0.5.3
+pytz==2025.2
+
+# Otras dependencias necesarias
+certifi==2025.4.26
+charset-normalizer==3.4.2
+idna==3.10
+requests==2.32.3
+urllib3==2.4.0
+PyYAML==6.0.2
