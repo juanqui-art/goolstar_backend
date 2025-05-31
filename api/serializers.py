@@ -140,11 +140,13 @@ class TorneoDetalleSerializer(serializers.ModelSerializer):
 
 class EstadisticaEquipoSerializer(serializers.ModelSerializer):
     equipo_nombre = serializers.ReadOnlyField(source='equipo.nombre')
+    grupo = serializers.ReadOnlyField(source='equipo.grupo')
     
     class Meta:
         model = EstadisticaEquipo
         fields = [
-            'id', 'equipo', 'equipo_nombre', 'torneo', 
+            'id', 'equipo', 'equipo_nombre', 'torneo',
+            'grupo',
             'puntos', 'partidos_jugados', 'partidos_ganados', 'partidos_empatados', 'partidos_perdidos',
             'goles_favor', 'goles_contra', 'diferencia_goles',
             'tarjetas_amarillas', 'tarjetas_rojas'
