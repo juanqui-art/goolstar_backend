@@ -84,7 +84,9 @@ MIDDLEWARE = [
 # Configuración de CORS
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',  # Para desarrollo local con Next.js
-    'https://goolstar.vercel.app',  # Frontend en Vercel
+    'https://goolstar.vercel.app',  # Frontend en Vercel principal
+    'https://goolstar-juanquiarts-projects.vercel.app',  # Frontend en Vercel secundario
+    'https://goolstar-697hki8h0-juanquiarts-projects.vercel.app',  # Frontend en Vercel preview
     'https://goolstar-backend.fly.dev',  # Backend en Fly.io
 ]
 
@@ -102,6 +104,9 @@ if not DEBUG:
 # Configuración de CSRF para Fly.io
 CSRF_TRUSTED_ORIGINS = [
     'https://goolstar-backend.fly.dev',
+    'https://goolstar.vercel.app',
+    'https://goolstar-juanquiarts-projects.vercel.app',
+    'https://goolstar-697hki8h0-juanquiarts-projects.vercel.app',
     'http://localhost:8000',
 ]
 
