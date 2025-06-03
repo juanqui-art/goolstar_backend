@@ -2,6 +2,7 @@
 Vistas relacionadas con la gestión de Torneos en el sistema.
 """
 from django.db.models import Count, Q
+from django_filters.rest_framework import DjangoFilterBackend  # ← LÍNEA 1 NUEVA
 from drf_spectacular.utils import extend_schema, extend_schema_view, OpenApiParameter
 from rest_framework import viewsets, filters
 from rest_framework.decorators import action
@@ -50,12 +51,14 @@ logger = get_logger(__name__)
 class TorneoViewSet(viewsets.ModelViewSet):
     """
     API endpoint para gestionar los Torneos.
-    
+
     Un torneo es la competición principal que agrupa equipos, partidos y estadísticas.
     """
     queryset = Torneo.objects.all().select_related('categoria').order_by('-fecha_inicio')
     serializer_class = TorneoSerializer
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter,
+                       filters.OrderingFilter]  # ← MODIFICAR: agregar DjangoFilterBackend
+    filterset_fields = ['activo', 'finalizado', 'fase_actual', 'categoria']  # ← LÍNEA 2 NUEVA
     search_fields = ['nombre', 'categoria__nombre']
     ordering_fields = ['nombre', 'fecha_inicio', 'categoria']
     permission_classes = [IsAuthenticatedOrReadOnly]

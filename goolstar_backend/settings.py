@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django_filters',  # Nombre corregido: con guión bajo, no con guión
     # Apps instaladas
     'rest_framework',
     'rest_framework.authtoken',  # Para autenticación basada en tokens
@@ -82,9 +83,9 @@ MIDDLEWARE = [
 
 # Configuración de CORS
 CORS_ALLOWED_ORIGINS = [
-    'http://localhost:3000',  # Para desarrollo con Next.js
-    'https://goolstar-frontend.fly.dev',  # Para producción (ajusta según tu dominio)
-    'https://goolstar-backend.fly.dev',  # Dominio de la API en Fly.io
+    'http://localhost:3000',  # Para desarrollo local con Next.js
+    'https://goolstar.vercel.app',  # Frontend en Vercel
+    'https://goolstar-backend.fly.dev',  # Backend en Fly.io
 ]
 
 # Configuración de seguridad para producción
@@ -109,8 +110,10 @@ ROOT_URLCONF = 'goolstar_backend.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [BASE_DIR / 'templates']
-        ,
+        'DIRS': [
+            BASE_DIR / 'templates',
+            BASE_DIR / 'api' / 'templates',  # Añadir el directorio de plantillas de api
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
