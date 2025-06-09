@@ -214,6 +214,9 @@ class Jugador(models.Model):
     nivel = models.IntegerField(choices=Nivel.choices, default=Nivel.MEDIO, null=True, blank=True)
     foto = models.ImageField(upload_to='fotos_jugadores/', blank=True, null=True)
 
+    # Campo para control de segunda fase
+    activo_segunda_fase = models.BooleanField(default=True)
+
     # Campos para control de suspensiones
     suspendido = models.BooleanField(default=False)
     partidos_suspension_restantes = models.PositiveSmallIntegerField(default=0)

@@ -7,6 +7,7 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from django.db import models
 from django.utils import timezone
+from django.contrib import messages
 
 # Importaciones de modelos base
 from .models.base import Categoria, Torneo, FaseEliminatoria
@@ -365,13 +366,13 @@ class EquipoAdmin(admin.ModelAdmin):
 
 @admin.register(Jugador)
 class JugadorAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'cedula', 'equipo', 'numero_dorsal', 'posicion')
-    list_filter = ('equipo__categoria', 'equipo', 'equipo__torneo')
+    list_display = ('__str__', 'cedula', 'equipo', 'numero_dorsal', 'posicion', 'activo_segunda_fase')
+    list_filter = ('equipo__categoria', 'equipo', 'equipo__torneo', 'activo_segunda_fase')
     search_fields = ('primer_nombre', 'primer_apellido', 'cedula')
     ordering = ('primer_apellido',)
     list_per_page = 25
     list_select_related = ('equipo',)  # Optimización para evitar N+1 queries
-    list_editable = ('cedula',)  # Solo cedula será editable directamente en la lista
+    list_editable = ('cedula', 'activo_segunda_fase')  # Solo cedula será editable directamente en la lista
 
     fieldsets = (
         ('Datos personales', {
@@ -385,7 +386,14 @@ class JugadorAdmin(admin.ModelAdmin):
             'fields': ('suspendido', 'partidos_suspension_restantes', 'fecha_fin_suspension'),
             'classes': ('collapse',)
         }),
+        ('Segunda fase', {
+            'fields': ('activo_segunda_fase',),
+            'description': 'Control para segunda fase (gestión manual)'
+        }),
     )
+    
+    # La validación ha sido desactivada a petición del usuario
+    # para permitir equipos con más de 12 jugadores activos
 
 
 # -----------------------------------------------------------------------------
