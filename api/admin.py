@@ -366,13 +366,13 @@ class EquipoAdmin(admin.ModelAdmin):
 
 @admin.register(Jugador)
 class JugadorAdmin(admin.ModelAdmin):
-    list_display = ('__str__', 'cedula', 'equipo', 'numero_dorsal', 'posicion', 'activo_segunda_fase')
-    list_filter = ('equipo__categoria', 'equipo', 'equipo__torneo', 'activo_segunda_fase')
+    list_display = ('__str__', 'cedula', 'equipo','suspendido', 'activo_segunda_fase')
+    list_filter = ('equipo__categoria', 'equipo', 'equipo__torneo', 'suspendido', 'activo_segunda_fase')
     search_fields = ('primer_nombre', 'primer_apellido', 'cedula')
     ordering = ('primer_apellido',)
     list_per_page = 25
     list_select_related = ('equipo',)  # Optimización para evitar N+1 queries
-    list_editable = ('cedula', 'activo_segunda_fase')  # Solo cedula será editable directamente en la lista
+    list_editable = ('cedula', 'suspendido', 'activo_segunda_fase')
 
     fieldsets = (
         ('Datos personales', {
