@@ -8,6 +8,7 @@ from django.core.validators import MinValueValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+from decimal import Decimal
 
 from .participantes import Equipo, Arbitro
 
@@ -42,7 +43,7 @@ class TransaccionPago(models.Model):
                                 null=True)
     fecha = models.DateTimeField(auto_now_add=True)
     tipo = models.CharField(max_length=20, choices=TipoTransaccion.choices)
-    monto = models.DecimalField(max_digits=8, decimal_places=2, validators=[MinValueValidator(0)])
+    monto = models.DecimalField(max_digits=8, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
     es_ingreso = models.BooleanField(default=False,
                                      help_text="True si es un ingreso para el torneo, False si es un gasto")
     concepto = models.CharField(max_length=100)
@@ -98,7 +99,7 @@ class PagoArbitro(models.Model):
     arbitro = models.ForeignKey(Arbitro, on_delete=models.CASCADE, related_name='pagos')
     partido = models.ForeignKey('api.Partido', on_delete=models.CASCADE, related_name='pagos_arbitro')
     equipo = models.ForeignKey(Equipo, on_delete=models.CASCADE, related_name='pagos_arbitro')
-    monto = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(0)])
+    monto = models.DecimalField(max_digits=6, decimal_places=2, validators=[MinValueValidator(Decimal('0'))])
     pagado = models.BooleanField(default=False)
     fecha_pago = models.DateTimeField(blank=True, null=True)
     metodo_pago = models.CharField(max_length=50, blank=True)
