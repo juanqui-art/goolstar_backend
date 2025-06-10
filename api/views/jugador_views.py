@@ -91,14 +91,14 @@ class JugadorViewSet(viewsets.ModelViewSet):
         logger.debug(f"Fecha actual para filtro de goleadores: {today}")
 
         # Consulta base con anotación de total_goles
-        queryset = Jugador.objects.annotate(
+        queryset = Jugador.objects.select_related('equipo').annotate(
             total_goles=Count('goles')
         ).filter(total_goles__gt=0)
 
         # Aplicar filtros adicionales si es necesario (por ejemplo, por torneo)
         torneo_id = request.query_params.get('torneo')
         if torneo_id:
-            queryset = Jugador.objects.annotate(
+            queryset = Jugador.objects.select_related('equipo').annotate(
                 total_goles=Count('goles', filter=Q(goles__partido__torneo_id=torneo_id))
             ).filter(total_goles__gt=0)
 

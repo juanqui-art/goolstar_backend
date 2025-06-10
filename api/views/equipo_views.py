@@ -18,7 +18,7 @@ class EquipoViewSet(viewsets.ModelViewSet):
     
     Un equipo pertenece a una categoría y tiene múltiples jugadores.
     """
-    queryset = Equipo.objects.all().select_related('categoria', 'torneo')
+    queryset = Equipo.objects.all().select_related('categoria', 'torneo').prefetch_related('jugadores')
     serializer_class = EquipoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre']
@@ -73,7 +73,7 @@ class EquipoViewSet(viewsets.ModelViewSet):
             logger.warning(f"Solicitud de equipos sin especificar categoria_id - Usuario: {request.user}")
             return Response({"error": "Debe especificar el parámetro categoria_id"}, status=400)
         
-        equipos = Equipo.objects.filter(categoria_id=categoria_id)
+        equipos = Equipo.objects.filter(categoria_id=categoria_id).select_related('categoria', 'torneo').prefetch_related('jugadores')
         serializer = self.get_serializer(equipos, many=True)
         
         logger.info(f"Equipos encontrados para categoría ID {categoria_id}: {equipos.count()}")

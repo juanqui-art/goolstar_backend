@@ -23,7 +23,10 @@ class PartidoViewSet(viewsets.ModelViewSet):
     Un partido se juega entre dos equipos, pertenece a una jornada y tiene registros
     asociados como goles y tarjetas.
     """
-    queryset = Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').order_by('-fecha', 'id')
+    queryset = Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').prefetch_related(
+        'goles__jugador__equipo',  # Optimizar goles con jugador y equipo
+        'tarjetas__jugador__equipo'  # Optimizar tarjetas con jugador y equipo
+    ).order_by('-fecha', 'id')
     serializer_class = PartidoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ['fecha']
@@ -66,7 +69,7 @@ class PartidoViewSet(viewsets.ModelViewSet):
         
         if jornada_id:
             try:
-                partidos = Partido.objects.filter(jornada_id=jornada_id).order_by('fecha')
+                partidos = Partido.objects.filter(jornada_id=jornada_id).select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').prefetch_related('goles', 'tarjetas').order_by('fecha')
                 serializer = self.get_serializer(partidos, many=True)
                 logger.info(f"Encontrados {len(partidos)} partidos para la jornada {jornada_id}")
                 return Response(serializer.data)
@@ -95,7 +98,7 @@ class PartidoViewSet(viewsets.ModelViewSet):
         if equipo_id:
             try:
                 partidos = Partido.objects.filter(equipo_1_id=equipo_id) | Partido.objects.filter(equipo_2_id=equipo_id)
-                partidos = partidos.order_by('fecha')
+                partidos = partidos.select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').prefetch_related('goles', 'tarjetas').order_by('fecha')
                 serializer = self.get_serializer(partidos, many=True)
                 logger.info(f"Encontrados {len(partidos)} partidos para el equipo {equipo_id}")
                 return Response(serializer.data)
@@ -154,7 +157,7 @@ class PartidoViewSet(viewsets.ModelViewSet):
                 fecha__gte=fecha_inicio_dt,
                 fecha__lte=fecha_fin_dt,
                 completado=False
-            ).select_related('equipo_1', 'equipo_2', 'torneo', 'jornada').order_by('fecha')
+            ).select_related('equipo_1', 'equipo_2', 'torneo', 'jornada').prefetch_related('goles', 'tarjetas').order_by('fecha')
             
             # Aplicamos filtros adicionales si existen
             if torneo_id:
