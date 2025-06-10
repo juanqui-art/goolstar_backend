@@ -92,14 +92,19 @@ CORS_ALLOWED_ORIGINS = [
 
 # Configuración de seguridad para producción
 if not DEBUG:
-    # Temporalmente desactivamos la redirección SSL forzada para solucionar problemas de despliegue
-    # en Fly.io. Normalmente debería estar activada en producción.
-    SECURE_SSL_REDIRECT = False  # Cambiado temporalmente de True a False
+    # SSL redirect habilitado para seguridad (Fly.io ya maneja esto con force_https)
+    SECURE_SSL_REDIRECT = False  # Fly.io maneja esto automáticamente
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
     SECURE_HSTS_SECONDS = 31536000  # 1 año
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+    
+    # Headers básicos de seguridad
+    SECURE_BROWSER_XSS_FILTER = True
+    SECURE_CONTENT_TYPE_NOSNIFF = True
+    SECURE_REFERRER_POLICY = 'strict-origin-when-cross-origin'
+    X_FRAME_OPTIONS = 'DENY'
 
 # Configuración de CSRF para Fly.io
 CSRF_TRUSTED_ORIGINS = [
@@ -148,12 +153,12 @@ if 'DATABASE_URL' in os.environ:
             'PASSWORD': os.environ.get('DATABASE_PASSWORD', ''),
             'HOST': os.environ.get('DATABASE_HOST', 'localhost'),
             'PORT': os.environ.get('DATABASE_PORT', '5432'),
-            'CONN_MAX_AGE': 600,
+            'CONN_MAX_AGE': 120,  # Reducido de 600 a 60 segundos
         }
     }
 
     # También intentamos parsear DATABASE_URL si está presente
-    db_from_env = dj_database_url.config(conn_max_age=600)
+    db_from_env = dj_database_url.config(conn_max_age=60)
     if db_from_env:
         DATABASES['default'].update(db_from_env)
 else:
@@ -358,6 +363,17 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
     ],
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    # Rate limiting (throttling) configuration
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle'
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '100/hour',     # Usuarios anónimos: 100 requests por hora
+        'user': '1000/hour',    # Usuarios autenticados: 1000 requests por hora
+        'login': '5/min',       # Login: máximo 5 intentos por minuto
+        'register': '3/min',    # Registro: máximo 3 registros por minuto
+    }
 }
 SPECTACULAR_SETTINGS = {
     'TITLE': 'GoolStar API',
