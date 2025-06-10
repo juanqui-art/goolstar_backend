@@ -81,6 +81,10 @@ MIDDLEWARE = [
     'api.middleware.logging_middleware.RequestLoggingMiddleware',  # Middleware para logging HTTP
 ]
 
+# Agregar middleware de performance solo en desarrollo
+if DEBUG:
+    MIDDLEWARE.insert(0, 'api.middleware.performance_middleware.PerformanceMiddleware')
+
 # Configuración de CORS
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:3000',  # Para desarrollo local con Next.js
