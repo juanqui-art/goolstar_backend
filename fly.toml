@@ -27,8 +27,8 @@ primary_region = 'mia'
 
 [http_service.concurrency]
   type = "connections"
-  hard_limit = 550
-  soft_limit = 500
+  hard_limit = 25
+  soft_limit = 20
 
 # Desactivamos temporalmente los healthchecks para permitir que la aplicación se inicie correctamente
 # [[http_service.checks]]
@@ -39,7 +39,7 @@ primary_region = 'mia'
 #   path = "/health/"
 
 [[vm]]
-  memory = '1gb'
+  memory = '2gb'
   cpu_kind = 'shared'
   cpus = 1
 
