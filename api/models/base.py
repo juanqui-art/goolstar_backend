@@ -8,6 +8,7 @@ from django.core.validators import MinValueValidator
 from django.utils.translation import gettext_lazy as _
 from django.core.exceptions import ValidationError
 from django.utils import timezone
+from decimal import Decimal
 
 
 class Nivel(models.IntegerChoices):
@@ -24,19 +25,19 @@ class Categoria(models.Model):
     nombre = models.CharField(max_length=50, unique=True)
     descripcion = models.TextField(blank=True)
     premio_primero = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True,
-                                         validators=[MinValueValidator(0)])
+                                         validators=[MinValueValidator(Decimal('0'))])
     premio_segundo = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True,
-                                         validators=[MinValueValidator(0)])
+                                         validators=[MinValueValidator(Decimal('0'))])
     premio_tercero = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True,
-                                         validators=[MinValueValidator(0)])
+                                         validators=[MinValueValidator(Decimal('0'))])
     premio_cuarto = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True,
-                                        validators=[MinValueValidator(0)])
+                                        validators=[MinValueValidator(Decimal('0'))])
     costo_inscripcion = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True,
-                                            validators=[MinValueValidator(0)])
+                                            validators=[MinValueValidator(Decimal('0'))])
     # Campos para configuración del torneo
-    costo_arbitraje = models.DecimalField(max_digits=6, decimal_places=2, default=10.00, validators=[MinValueValidator(0)])
-    multa_amarilla = models.DecimalField(max_digits=6, decimal_places=2, default=2.00, validators=[MinValueValidator(0)])
-    multa_roja = models.DecimalField(max_digits=6, decimal_places=2, default=3.00, validators=[MinValueValidator(0)])
+    costo_arbitraje = models.DecimalField(max_digits=6, decimal_places=2, default=10.00, validators=[MinValueValidator(Decimal('0'))])
+    multa_amarilla = models.DecimalField(max_digits=6, decimal_places=2, default=2.00, validators=[MinValueValidator(Decimal('0'))])
+    multa_roja = models.DecimalField(max_digits=6, decimal_places=2, default=3.00, validators=[MinValueValidator(Decimal('0'))])
     limite_inasistencias = models.PositiveSmallIntegerField(default=3)
     limite_amarillas_suspension = models.PositiveSmallIntegerField(default=3)
     partidos_suspension_roja = models.PositiveSmallIntegerField(default=2)
