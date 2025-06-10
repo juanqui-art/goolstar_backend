@@ -22,5 +22,5 @@ RUN python manage.py collectstatic --noinput
 # Exponer el puerto - esto es muy importante para Fly.io
 EXPOSE ${PORT}
 
-# Ejecutar migraciones y servidor
-CMD ["sh", "-c", "python manage.py migrate && gunicorn goolstar_backend.wsgi:application --bind 0.0.0.0:${PORT}"]
+# Ejecutar servidor sin migraciones por ahora para evitar problemas de conexión DB
+CMD ["gunicorn", "goolstar_backend.wsgi:application", "--bind", "0.0.0.0:8000"]
