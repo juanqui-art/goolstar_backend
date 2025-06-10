@@ -11,6 +11,7 @@ dj-database-url==2.1.0
 djangorestframework-simplejwt==5.4.0
 PyJWT==2.9.0
 python-dotenv==1.0.0
+django-ratelimit==4.1.0
 
 # CORS y seguridad HTTP
 django-cors-headers==4.3.1
