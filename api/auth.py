@@ -4,14 +4,32 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.permissions import AllowAny
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from django.contrib.auth.models import User
 from django.contrib.auth import authenticate
+
+# Clases de throttling personalizadas para endpoints críticos
+class LoginRateThrottle(AnonRateThrottle):
+    """
+    Rate limiting específico para login: máximo 5 intentos por minuto por IP.
+    Previene ataques de fuerza bruta en autenticación.
+    """
+    scope = 'login'
+
+class RegisterRateThrottle(AnonRateThrottle):
+    """
+    Rate limiting específico para registro: máximo 3 registros por minuto por IP.
+    Previene spam de cuentas y abuso del sistema de registro.
+    """
+    scope = 'register'
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     """
     Vista personalizada para obtener pares de tokens JWT.
     Extiende la vista TokenObtainPairView para devolver información adicional del usuario.
+    Con rate limiting: máximo 5 intentos de login por minuto por IP.
     """
+    throttle_classes = [LoginRateThrottle]
     
     def post(self, request, *args, **kwargs):
         """
@@ -41,8 +59,10 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 class RegistroUsuarioView(APIView):
     """
     Vista para registrar nuevos usuarios en el sistema.
+    Con rate limiting: máximo 3 registros por minuto por IP.
     """
     permission_classes = [AllowAny]
+    throttle_classes = [RegisterRateThrottle]
     
     def post(self, request):
         """
