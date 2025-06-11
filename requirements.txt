@@ -13,6 +13,10 @@ PyJWT==2.9.0
 python-dotenv==1.0.0
 django-ratelimit==4.1.0
 
+# Cache con Redis
+redis==5.0.1
+django-redis==5.4.0
+
 # CORS y seguridad HTTP
 django-cors-headers==4.3.1
 whitenoise==6.6.0

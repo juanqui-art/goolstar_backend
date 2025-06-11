@@ -417,3 +417,49 @@ if 'test' in sys.argv:
 
 # Deshabilitar redirección automática para barras diagonales finales
 APPEND_SLASH = True
+
+# Redis Cache Configuration (opcional - fallback a LocMemCache si no está disponible)
+REDIS_URL = os.environ.get('REDIS_URL')
+
+if REDIS_URL:
+    # Usar Redis si está configurado
+    CACHES = {
+        'default': {
+            'BACKEND': 'django_redis.cache.RedisCache',
+            'LOCATION': REDIS_URL,
+            'OPTIONS': {
+                'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+                'CONNECTION_POOL_KWARGS': {
+                    'max_connections': 20,
+                    'retry_on_timeout': True,
+                },
+                'SERIALIZER': 'django_redis.serializers.json.JSONSerializer',
+                'IGNORE_EXCEPTIONS': True,  # No fallar si Redis no está disponible
+            },
+            'KEY_PREFIX': 'goolstar',
+            'TIMEOUT': 300,  # 5 minutos por defecto
+        }
+    }
+else:
+    # Fallback a cache en memoria local si Redis no está configurado
+    CACHES = {
+        'default': {
+            'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+            'LOCATION': 'goolstar-cache',
+            'TIMEOUT': 300,
+            'OPTIONS': {
+                'MAX_ENTRIES': 1000,
+                'CULL_FREQUENCY': 3,
+            }
+        }
+    }
+
+# Configuración específica de cache
+CACHE_TTL = {
+    'tabla_posiciones': 300,     # 5 minutos - se actualiza frecuentemente
+    'estadisticas_equipo': 600,  # 10 minutos 
+    'partidos_proximos': 180,    # 3 minutos - información crítica
+    'equipos_categoria': 1800,   # 30 minutos - cambia poco
+    'jugadores_equipo': 900,     # 15 minutos
+    'torneo_detalle': 3600,      # 1 hora - información estable
+}
