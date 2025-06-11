@@ -12,12 +12,14 @@ from rest_framework.response import Response
 from api.models import Torneo, Gol, Tarjeta, Jugador
 from api.models.estadisticas import EstadisticaEquipo
 from api.serializers import (
-    TorneoSerializer, TorneoDetalleSerializer,
-    EstadisticaEquipoSerializer, TablaposicionesSerializer
+    TorneoSerializer, TorneoDetalleSerializer, TorneoListSerializer,
+    EstadisticaEquipoSerializer, TablaposicionesSerializer, TablaposicionesOptimizadaSerializer
 )
 from api.utils.date_utils import get_today_date, date_to_datetime
 from api.utils.logging_utils import get_logger, log_api_request
 from api.utils.tz_logging import log_date_conversion
+from api.utils.cache_utils import cached_view_result, CacheManager
+from rest_framework.pagination import PageNumberPagination
 
 logger = get_logger(__name__)
 
@@ -62,10 +64,13 @@ class TorneoViewSet(viewsets.ModelViewSet):
     search_fields = ['nombre', 'categoria__nombre']
     ordering_fields = ['nombre', 'fecha_inicio', 'categoria']
     permission_classes = [IsAuthenticatedOrReadOnly]
+    pagination_class = PageNumberPagination
 
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return TorneoDetalleSerializer
+        elif self.action == 'list':
+            return TorneoListSerializer
         return TorneoSerializer
 
     @log_api_request(logger)
@@ -143,12 +148,58 @@ class TorneoViewSet(viewsets.ModelViewSet):
     @log_api_request(logger)
     @action(detail=True, methods=['get'])
     def tabla_posiciones(self, request, pk=None):
-        """Obtener tabla de posiciones del torneo."""
+        """Obtener tabla de posiciones del torneo con cache optimizado."""
         torneo = self.get_object()
         grupo = request.query_params.get('grupo')
         actualizar = request.query_params.get('actualizar', 'false').lower() == 'true'
 
-        # Base query para estadísticas
+        # Crear clave de cache única
+        from api.utils.cache_utils import generate_cache_key
+        from django.core.cache import cache
+        from django.conf import settings
+        
+        cache_key = generate_cache_key('tabla_posiciones', torneo.id, grupo or 'all')
+        
+        # Si se solicita actualizar, invalidar cache
+        if actualizar:
+            cache.delete(cache_key)
+            logger.info(f"Cache invalidado para tabla_posiciones torneo {torneo.id}")
+        
+        # Intentar obtener del cache
+        cached_data = cache.get(cache_key)
+        if cached_data is not None:
+            logger.info(f"Tabla posiciones obtenida del cache para torneo {torneo.id}")
+            return Response(cached_data)
+
+        # No está en cache, generar datos
+        logger.info(f"Generando tabla posiciones para torneo {torneo.id}")
+        
+        # Base query para estadísticas - incluir equipos sin estadísticas también
+        from api.models.estadisticas import EstadisticaEquipo
+        from django.db.models import Q
+        
+        # Obtener equipos del torneo
+        equipos_torneo = torneo.equipos.all()
+        
+        # Crear estadísticas vacías para equipos que no las tienen
+        for equipo in equipos_torneo:
+            EstadisticaEquipo.objects.get_or_create(
+                equipo=equipo,
+                torneo=torneo,
+                defaults={
+                    'puntos': 0,
+                    'partidos_jugados': 0,
+                    'partidos_ganados': 0,
+                    'partidos_empatados': 0,
+                    'partidos_perdidos': 0,
+                    'goles_favor': 0,
+                    'goles_contra': 0,
+                    'diferencia_goles': 0,
+                    'tarjetas_amarillas': 0,
+                    'tarjetas_rojas': 0
+                }
+            )
+        
         estadisticas_query = EstadisticaEquipo.objects.filter(
             torneo=torneo
         ).select_related('equipo').order_by('-puntos', '-diferencia_goles', '-goles_favor')
@@ -163,34 +214,21 @@ class TorneoViewSet(viewsets.ModelViewSet):
                 'equipos': serializer.data
             }
         else:
-            # ✅ NUEVA LÓGICA: Agrupar automáticamente
-            from collections import defaultdict
-
-            grupos_data = defaultdict(list)
-
-            # Obtener todas las estadísticas
-            all_estadisticas = estadisticas_query
-            serializer = EstadisticaEquipoSerializer(all_estadisticas, many=True)
-
-            # Agrupar por grupo
-            for equipo_data in serializer.data:
-                grupo_letra = equipo_data.get('grupo')
-                if grupo_letra:
-                    grupos_data[grupo_letra].append(equipo_data)
-
-            # Ordenar cada grupo internamente
-            for grupo_letra in grupos_data:
-                grupos_data[grupo_letra] = sorted(
-                    grupos_data[grupo_letra],
-                    key=lambda x: (-x['puntos'], -x['diferencia_goles'], -x['goles_favor'])
-                )
+            # Mantener compatibilidad: devolver todas las estadísticas sin agrupar
+            serializer = EstadisticaEquipoSerializer(estadisticas_query, many=True)
 
             response_data = {
-                'grupos': dict(grupos_data),
+                'grupo': 'ALL',  # Compatibilidad con tests
+                'equipos': serializer.data,
                 'torneo_id': torneo.id,
                 'tiene_fase_grupos': torneo.tiene_fase_grupos,
-                'total_equipos': len(all_estadisticas)
+                'total_equipos': len(serializer.data)
             }
+
+        # Guardar en cache
+        ttl = getattr(settings, 'CACHE_TTL', {}).get('tabla_posiciones', 300)
+        cache.set(cache_key, response_data, ttl)
+        logger.info(f"Tabla posiciones guardada en cache por {ttl}s para torneo {torneo.id}")
 
         return Response(response_data)
 

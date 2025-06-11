@@ -10,7 +10,8 @@ from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from rest_framework.response import Response
 
 from api.models import Jugador
-from api.serializers import JugadorSerializer
+from api.serializers import JugadorSerializer, JugadorListSerializer
+# Ya existe PageNumberPagination importado arriba
 from api.utils.date_utils import get_today_date
 from api.utils.logging_utils import get_logger, log_api_request
 
@@ -36,6 +37,11 @@ class JugadorViewSet(viewsets.ModelViewSet):
     ordering_fields = ['primer_apellido', 'primer_nombre']
     permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = StandardResultsSetPagination
+    
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return JugadorListSerializer
+        return JugadorSerializer
 
     @log_api_request(logger)
     def list(self, request, *args, **kwargs):

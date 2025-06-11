@@ -10,7 +10,8 @@ from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 
 from api.models import Partido
-from api.serializers import PartidoSerializer, PartidoDetalleSerializer
+from api.serializers import PartidoSerializer, PartidoDetalleSerializer, PartidoListSerializer
+from rest_framework.pagination import PageNumberPagination
 from api.utils.logging_utils import get_logger, log_api_request
 from api.utils.date_utils import get_today_date, get_date_range
 
@@ -31,11 +32,26 @@ class PartidoViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ['fecha']
     permission_classes = [IsAuthenticatedOrReadOnly]
+    pagination_class = PageNumberPagination
     
     def get_serializer_class(self):
         if self.action == 'retrieve':
             return PartidoDetalleSerializer
+        elif self.action == 'list':
+            return PartidoListSerializer
         return PartidoSerializer
+    
+    def get_queryset(self):
+        """Optimizar queryset según la acción"""
+        if self.action == 'retrieve':
+            # Para detalle, necesitamos todas las relaciones
+            return Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').prefetch_related(
+                'goles__jugador__equipo',
+                'tarjetas__jugador__equipo'
+            ).order_by('-fecha', 'id')
+        else:
+            # Para listado, solo lo básico
+            return Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').order_by('-fecha', 'id')
     
     @log_api_request(logger)
     def list(self, request, *args, **kwargs):

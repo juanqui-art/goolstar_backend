@@ -160,3 +160,106 @@ class TablaposicionesSerializer(serializers.Serializer):
     class Meta:
         # Esto ayuda a drf-spectacular a generar mejores tipos
         ref_name = 'TablaPosiciones'
+
+
+# ============ SERIALIZERS OPTIMIZADOS ============
+# Versiones optimizadas para mejorar rendimiento de respuestas
+
+class EquipoListSerializer(serializers.ModelSerializer):
+    """Serializer optimizado para listado de equipos (solo campos esenciales)"""
+    categoria_nombre = serializers.ReadOnlyField(source='categoria.nombre')
+    
+    class Meta:
+        model = Equipo
+        fields = [
+            'id', 'nombre', 'categoria', 'categoria_nombre', 
+            'activo', 'estado', 'fecha_registro'
+        ]
+
+
+class JugadorListSerializer(serializers.ModelSerializer):
+    """Serializer optimizado para listado de jugadores (solo campos esenciales)"""
+    equipo_nombre = serializers.ReadOnlyField(source='equipo.nombre')
+    
+    class Meta:
+        model = Jugador
+        fields = [
+            'id', 'primer_nombre', 'primer_apellido', 'segundo_apellido',
+            'cedula', 'equipo', 'equipo_nombre', 'numero_dorsal', 'posicion'
+        ]
+
+
+class PartidoListSerializer(serializers.ModelSerializer):
+    """Serializer optimizado para listado de partidos (solo campos esenciales)"""
+    equipo_1_nombre = serializers.ReadOnlyField(source='equipo_1.nombre')
+    equipo_2_nombre = serializers.ReadOnlyField(source='equipo_2.nombre')
+    
+    class Meta:
+        model = Partido
+        fields = [
+            'id', 'fecha', 'equipo_1', 'equipo_1_nombre', 
+            'equipo_2', 'equipo_2_nombre', 'goles_equipo_1', 
+            'goles_equipo_2', 'completado'
+        ]
+
+
+class GolListSerializer(serializers.ModelSerializer):
+    """Serializer optimizado para listado de goles (solo campos esenciales)"""
+    jugador_nombre = serializers.ReadOnlyField(source='jugador.__str__')
+    equipo_nombre = serializers.ReadOnlyField(source='jugador.equipo.nombre')
+    
+    class Meta:
+        model = Gol
+        fields = [
+            'id', 'jugador', 'jugador_nombre', 'equipo_nombre',
+            'partido', 'minuto', 'autogol'
+        ]
+
+
+class TarjetaListSerializer(serializers.ModelSerializer):
+    """Serializer optimizado para listado de tarjetas (solo campos esenciales)"""
+    jugador_nombre = serializers.ReadOnlyField(source='jugador.__str__')
+    equipo_nombre = serializers.ReadOnlyField(source='jugador.equipo.nombre')
+    
+    class Meta:
+        model = Tarjeta
+        fields = [
+            'id', 'jugador', 'jugador_nombre', 'equipo_nombre',
+            'partido', 'tipo', 'fecha', 'pagada'
+        ]
+
+
+class TorneoListSerializer(serializers.ModelSerializer):
+    """Serializer optimizado para listado de torneos (solo campos esenciales)"""
+    categoria_nombre = serializers.ReadOnlyField(source='categoria.nombre')
+    
+    class Meta:
+        model = Torneo
+        fields = [
+            'id', 'nombre', 'categoria', 'categoria_nombre',
+            'fecha_inicio', 'fecha_fin', 'activo', 'fase_actual'
+        ]
+
+
+# ============ SERIALIZERS PARA ESTADÍSTICAS OPTIMIZADAS ============
+
+class EstadisticaEquipoListSerializer(serializers.ModelSerializer):
+    """Serializer optimizado para tabla de posiciones (solo campos de estadísticas)"""
+    equipo_nombre = serializers.ReadOnlyField(source='equipo.nombre')
+    
+    class Meta:
+        model = EstadisticaEquipo
+        fields = [
+            'equipo', 'equipo_nombre', 'puntos', 'partidos_jugados',
+            'partidos_ganados', 'partidos_empatados', 'partidos_perdidos',
+            'goles_favor', 'goles_contra', 'diferencia_goles'
+        ]
+
+
+class TablaposicionesOptimizadaSerializer(serializers.Serializer):
+    """Serializer optimizado para tabla de posiciones sin campos innecesarios"""
+    grupo = serializers.CharField(max_length=20, required=False)
+    equipos = EstadisticaEquipoListSerializer(many=True, read_only=True)
+    
+    class Meta:
+        ref_name = 'TablaPosicionesOptimizada'

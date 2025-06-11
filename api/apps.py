@@ -11,3 +11,4 @@ class ApiConfig(AppConfig):
         Importamos las señales para asegurar que sean registradas.
         """
         import api.signals  # importamos las señales para registrarlas
+        import api.signals_cache  # importamos las señales de cache
