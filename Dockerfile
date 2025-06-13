@@ -9,7 +9,13 @@ ENV DEBUG=False
 # Asegurarnos de que Fly.io reconozca esta variable
 ENV PORT=8000
 
-# Instalar dependencias
+# Instalar dependencias del sistema necesarias para python-magic
+RUN apt-get update && apt-get install -y \
+    libmagic1 \
+    libmagic-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Instalar dependencias de Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 

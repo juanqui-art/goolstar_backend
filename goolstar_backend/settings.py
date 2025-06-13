@@ -64,6 +64,9 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt',  # Para autenticación con JWT
     'rest_framework_simplejwt.token_blacklist',  # Añadido para permitir blacklist de tokens
     'drf_spectacular',
+    # Cloudinary para almacenamiento de documentos
+    'cloudinary_storage',
+    'cloudinary',
     # Apps locales
     'api',
 ]
@@ -216,6 +219,32 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # Media files (Uploads)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
+
+# Configuración de Cloudinary para documentos de jugadores
+import cloudinary
+import cloudinary.uploader
+import cloudinary.api
+
+CLOUDINARY_STORAGE = {
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    'API_KEY': os.environ.get('CLOUDINARY_API_KEY'),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET'),
+    'SECURE': True,  # Usar HTTPS
+    'FOLDER': 'goolstar_documentos',  # Carpeta específica para documentos
+}
+
+# Configurar Cloudinary con las credenciales
+cloudinary.config(
+    cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
+    api_key=CLOUDINARY_STORAGE['API_KEY'],
+    api_secret=CLOUDINARY_STORAGE['API_SECRET'],
+    secure=CLOUDINARY_STORAGE['SECURE']
+)
+
+# Configuración de seguridad para subida de archivos
+CLOUDINARY_ALLOWED_FORMATS = ['jpg', 'jpeg', 'png', 'pdf']
+CLOUDINARY_MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB máximo por archivo
+CLOUDINARY_RESOURCE_TYPE = 'auto'  # Auto-detectar tipo de recurso
 
 # Configuración de Logging
 LOGS_DIR = BASE_DIR / 'logs'
@@ -372,12 +401,12 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle'
     ],
-    'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',     # Usuarios anónimos: 100 requests por hora
-        'user': '1000/hour',    # Usuarios autenticados: 1000 requests por hora
-        'login': '5/min',       # Login: máximo 5 intentos por minuto
-        'register': '3/min',    # Registro: máximo 3 registros por minuto
-    }
+     'DEFAULT_THROTTLE_RATES': {
+          'anon': '1000/hour',    # ✅ Aumentado de 100 a 1000
+          'user': '5000/hour',    # ✅ Aumentado de 1000 a 5000
+          'login': '20/min',      # ✅ Aumentado de 5 a 20
+          'register': '10/min',   # ✅ Aumentado de 3 a 10
+      }
 }
 SPECTACULAR_SETTINGS = {
     'TITLE': 'GoolStar API',

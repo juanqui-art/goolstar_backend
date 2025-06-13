@@ -1,8 +1,8 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    CategoriaViewSet, EquipoViewSet, JugadorViewSet, JornadaViewSet,
-    PartidoViewSet, GolViewSet, TarjetaViewSet, TorneoViewSet
+    CategoriaViewSet, EquipoViewSet, JugadorViewSet, JugadorDocumentoViewSet,
+    JornadaViewSet, PartidoViewSet, GolViewSet, TarjetaViewSet, TorneoViewSet
 )
 from .auth import CustomTokenObtainPairView, RegistroUsuarioView
 from rest_framework_simplejwt.views import TokenRefreshView
@@ -11,6 +11,7 @@ router = DefaultRouter()
 router.register(r'categorias', CategoriaViewSet)
 router.register(r'equipos', EquipoViewSet)
 router.register(r'jugadores', JugadorViewSet)
+router.register(r'jugador-documentos', JugadorDocumentoViewSet, basename='jugadordocumento')
 router.register(r'jornadas', JornadaViewSet)
 router.register(r'partidos', PartidoViewSet)
 router.register(r'goles', GolViewSet)

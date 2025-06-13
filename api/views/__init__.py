@@ -9,6 +9,7 @@ mejorando la organización del código y facilitando el mantenimiento.
 from .categoria_views import CategoriaViewSet
 from .equipo_views import EquipoViewSet
 from .jugador_views import JugadorViewSet
+from .jugador_documento_views import JugadorDocumentoViewSet
 from .jornada_views import JornadaViewSet
 from .partido_views import PartidoViewSet
 from .gol_views import GolViewSet
@@ -20,6 +21,7 @@ __all__ = [
     'CategoriaViewSet',
     'EquipoViewSet',
     'JugadorViewSet',
+    'JugadorDocumentoViewSet',
     'JornadaViewSet',
     'PartidoViewSet',
     'GolViewSet',

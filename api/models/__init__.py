@@ -7,7 +7,7 @@ Este archivo importa todos los modelos para que sean accesibles desde api.models
 from .base import Nivel, Categoria, Torneo, FaseEliminatoria
 
 # Importaciones de modelos de participantes
-from .participantes import Dirigente, Equipo, Jugador, Arbitro
+from .participantes import Dirigente, Equipo, Jugador, Arbitro, JugadorDocumento
 
 # Importaciones de modelos de competición
 from .competicion import Jornada, Partido, Gol, Tarjeta, CambioJugador, EventoPartido
