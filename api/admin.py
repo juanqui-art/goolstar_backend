@@ -171,7 +171,8 @@ class EquipoAdmin(admin.ModelAdmin):
     list_display = ('nombre', 'categoria', 'torneo', 'grupo', 'nivel', 'activo', 'estado', 'deuda_total', 'numero_jugadores')
     list_filter = ('categoria', 'torneo', 'activo', 'estado', 'grupo')
     search_fields = ('nombre',)
-    list_select_related = ('categoria', 'torneo')  # Optimización para evitar N+1 queries
+    list_select_related = ('categoria', 'torneo', 'dirigente')  # Optimización para evitar N+1 queries
+    list_prefetch_related = ('jugadores',)  # Prefetch jugadores para método numero_jugadores
     inlines = [JugadorInline]
     actions = ['descargar_lista_jugadores_pdf', 'descargar_historial_partidos_pdf', 'marcar_como_retirados', 'descargar_balance_financiero_pdf']
 
