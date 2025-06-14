@@ -38,11 +38,12 @@ if SECRET_KEY is None:
         SECRET_KEY = 'django-insecure-t03zw!p1mo32-9&d_z&%&fltgm!=td5qn$4piq%n!+zj&tbx%$'
 
 # SECURITY WARNING: don't run with debug turned on in production!
-# Por defecto, DEBUG es False en producción
-DEBUG = False
-if os.environ.get('PRODUCTION', 'False') != 'True':
-    # Solo habilitar DEBUG si estamos en desarrollo y se especifica explícitamente
-    DEBUG = os.environ.get('DEBUG', 'False') == 'True'
+# TEMPORALMENTE ACTIVADO PARA DEBUGGING - REVERTIR DESPUÉS
+DEBUG = False  # ⚠️ TEMPORAL: Activado para diagnóstico del error 500
+# DEBUG = False
+# if os.environ.get('PRODUCTION', 'False') != 'True':
+#     # Solo habilitar DEBUG si estamos en desarrollo y se especifica explícitamente
+#     DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 ALLOWED_HOSTS = ['localhost', '127.0.0.1', '.fly.dev']
 
@@ -343,6 +344,17 @@ LOGGING = {
             'handlers': ['console', 'file_info', 'file_error'],
             'level': 'DEBUG',
             'propagate': True,
+        },
+        # Logger específico para documentos de jugadores y Cloudinary
+        'api.models.participantes': {
+            'handlers': ['console', 'file_debug', 'file_error'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'cloudinary': {
+            'handlers': ['console', 'file_debug', 'file_error'],
+            'level': 'DEBUG',
+            'propagate': False,
         },
         'api.middleware.logging': {
             'handlers': ['console', 'file_info', 'file_error'],
