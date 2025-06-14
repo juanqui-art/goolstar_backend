@@ -105,11 +105,21 @@ class TorneoAdmin(admin.ModelAdmin):
         if not obj.tiene_fase_grupos:
             return "No aplica"
 
-        grupos = {}
+        # Optimize: Use single query with conditional aggregation instead of multiple queries
+        grupos_conteo = obj.equipos.filter(activo=True).values('grupo').annotate(
+            count=models.Count('id')
+        ).order_by('grupo')
+        
+        # Convert to dict for easy lookup
+        grupos_dict = {g['grupo']: g['count'] for g in grupos_conteo if g['grupo']}
+        
+        # Build result for configured number of groups
+        resultado = []
         for letra in ['A', 'B', 'C', 'D'][:obj.numero_grupos]:
-            grupos[letra] = obj.equipos.filter(grupo=letra, activo=True).count()
+            count = grupos_dict.get(letra, 0)
+            resultado.append(f"Grupo {letra}: {count}")
 
-        return " | ".join([f"Grupo {g}: {c}" for g, c in grupos.items()])
+        return " | ".join(resultado)
 
     equipos_por_grupo.short_description = "Equipos por grupo"
 
@@ -119,6 +129,7 @@ class FaseEliminatoriaAdmin(admin.ModelAdmin):
     list_display = ('torneo', 'nombre', 'orden', 'fecha_inicio', 'fecha_fin', 'completada')
     list_filter = ('torneo', 'completada')
     search_fields = ('nombre',)
+    list_select_related = ('torneo',)  # Optimización para evitar N+1 queries
 
 
 @admin.register(Jornada)
@@ -149,6 +160,10 @@ class JugadorInline(admin.TabularInline):
     fields = ('primer_nombre', 'primer_apellido', 'cedula', 'posicion', 'numero_dorsal')
     extra = 1
     show_change_link = True
+    
+    def get_queryset(self, request):
+        """Optimize queryset for inline display"""
+        return super().get_queryset(request).select_related('equipo')
 
 
 @admin.register(Equipo)
@@ -182,7 +197,8 @@ class EquipoAdmin(admin.ModelAdmin):
     
     def numero_jugadores(self, obj):
         """Muestra el número de jugadores y lo resalta en rojo si excede 12"""
-        count = obj.jugadores.count()
+        # Use annotated count to avoid N+1 query
+        count = getattr(obj, 'numero_jugadores_count', obj.jugadores.count())
         if count > 12:
             return format_html('<span style="color: red; font-weight: bold;">{}</span>', count)
         return count
@@ -210,8 +226,8 @@ class EquipoAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         queryset = queryset.annotate(
-            jugadores__count=models.Count('jugadores')
-        )
+            numero_jugadores_count=models.Count('jugadores')
+        ).select_related('categoria', 'torneo', 'dirigente')
         return queryset
     
     def descargar_lista_jugadores_pdf(self, request, queryset):
@@ -222,8 +238,8 @@ class EquipoAdmin(admin.ModelAdmin):
             
         equipo = queryset.first()
         
-        # Obtener jugadores del equipo
-        jugadores = equipo.jugadores.all().order_by('numero_dorsal')
+        # Obtener jugadores del equipo - optimized with select_related
+        jugadores = equipo.jugadores.select_related('equipo').all().order_by('numero_dorsal')
         
         # Preparar contexto para la plantilla
         context = {
@@ -261,8 +277,11 @@ class EquipoAdmin(admin.ModelAdmin):
         equipo = queryset.first()
         
         # Obtener todos los partidos donde participó el equipo (como local o visitante)
+        # Optimized with select_related to avoid N+1 queries
         partidos = Partido.objects.filter(
             models.Q(equipo_1=equipo) | models.Q(equipo_2=equipo)
+        ).select_related(
+            'equipo_1', 'equipo_2', 'jornada', 'torneo', 'arbitro', 'fase_eliminatoria'
         ).order_by('fecha')
         
         # Preparar contexto para la plantilla
@@ -311,18 +330,15 @@ class EquipoAdmin(admin.ModelAdmin):
         ).aggregate(total=models.Sum('monto'))['total'] or Decimal('0.00')
         saldo_inscripcion = costo_inscripcion - abonos_inscripcion
         
-        # Obtener tarjetas pendientes de pago
-        tarjetas_amarillas = Tarjeta.objects.filter(
+        # Obtener tarjetas pendientes de pago - optimized with single query and prefetch
+        tarjetas_pendientes = Tarjeta.objects.filter(
             jugador__equipo=equipo, 
-            tipo='AMARILLA', 
             pagada=False
-        ).select_related('jugador', 'partido')
+        ).select_related('jugador', 'partido', 'jugador__equipo')
         
-        tarjetas_rojas = Tarjeta.objects.filter(
-            jugador__equipo=equipo, 
-            tipo='ROJA', 
-            pagada=False
-        ).select_related('jugador', 'partido')
+        # Separate by type using Python filtering to avoid additional queries
+        tarjetas_amarillas = [t for t in tarjetas_pendientes if t.tipo == 'AMARILLA']
+        tarjetas_rojas = [t for t in tarjetas_pendientes if t.tipo == 'ROJA']
         
         # Calcular totales
         total_amarillas = sum(t.monto_multa for t in tarjetas_amarillas)
@@ -410,10 +426,10 @@ class GolInline(admin.TabularInline):
             # Obtenemos el partido desde el parent_obj (el objeto que está siendo editado)
             partido = self.parent_obj
             if partido and partido.pk:
-                # Filtramos jugadores que pertenecen a los equipos del partido
+                # Filtramos jugadores que pertenecen a los equipos del partido - optimized
                 kwargs["queryset"] = Jugador.objects.filter(
                     equipo__in=[partido.equipo_1, partido.equipo_2]
-                ).order_by('equipo__nombre', 'primer_apellido')
+                ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
@@ -427,10 +443,10 @@ class TarjetaInline(admin.TabularInline):
             # Obtenemos el partido desde el parent_obj (el objeto que está siendo editado)
             partido = self.parent_obj
             if partido and partido.pk:
-                # Filtramos jugadores que pertenecen a los equipos del partido
+                # Filtramos jugadores que pertenecen a los equipos del partido - optimized
                 kwargs["queryset"] = Jugador.objects.filter(
                     equipo__in=[partido.equipo_1, partido.equipo_2]
-                ).order_by('equipo__nombre', 'primer_apellido')
+                ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
@@ -444,10 +460,10 @@ class CambioJugadorInline(admin.TabularInline):
             # Obtenemos el partido desde el parent_obj (el objeto que está siendo editado)
             partido = self.parent_obj
             if partido and partido.pk:
-                # Filtramos jugadores que pertenecen a los equipos del partido
+                # Filtramos jugadores que pertenecen a los equipos del partido - optimized
                 kwargs["queryset"] = Jugador.objects.filter(
                     equipo__in=[partido.equipo_1, partido.equipo_2]
-                ).order_by('equipo__nombre', 'primer_apellido')
+                ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
@@ -483,12 +499,12 @@ class EquipoFilter(SimpleListFilter):
     parameter_name = 'equipo'
     
     def lookups(self, request, model_admin):
-        # Get all teams involved in any matches - mantenemos la lógica de búsqueda igual
+        # Get all teams involved in any matches - optimized to use values_list for better performance
         equipos = Equipo.objects.filter(
             models.Q(partidos_como_local__isnull=False) | 
             models.Q(partidos_como_visitante__isnull=False)
-        ).distinct().order_by('nombre')
-        return [(str(equipo.id), equipo.nombre) for equipo in equipos]
+        ).distinct().values_list('id', 'nombre').order_by('nombre')
+        return [(str(equipo_id), nombre) for equipo_id, nombre in equipos]
     
     def queryset(self, request, queryset):
         if not self.value():
@@ -548,7 +564,10 @@ class PartidoAdmin(admin.ModelAdmin):
     
     def get_queryset(self, request):
         qs = super().get_queryset(request)
-        return qs.select_related('equipo_1', 'equipo_2', 'jornada', 'torneo', 'arbitro', 'equipo_ganador_default')
+        return qs.select_related(
+            'equipo_1', 'equipo_2', 'jornada', 'torneo', 'arbitro', 
+            'equipo_ganador_default', 'fase_eliminatoria', 'equipo_pone_balon'
+        )
     
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         """Filtra equipos por grupo si se está creando un partido nuevo"""
