@@ -13,19 +13,42 @@ from .models.competicion import Partido
 def actualizar_estadisticas_partido(sender, instance, created, **kwargs):
     """
     Señal que se ejecuta después de guardar un objeto Partido.
-    Si el partido acaba de ser marcado como completado, actualiza las estadísticas
+    Si el partido está marcado como completado, actualiza las estadísticas
     relacionadas con el partido.
     """
-    # Verificar si el partido fue marcado como completado
-    # El atributo _actualizar_estadisticas es establecido en el método save() del modelo
-    if hasattr(instance, '_actualizar_estadisticas') and instance._actualizar_estadisticas:
+    # Verificar si el partido está completado
+    if instance.completado:
         try:
             logger.info(f"Actualizando estadísticas para el partido {instance.id} entre {instance.equipo_1} y {instance.equipo_2}")
-            # Llamar al método para actualizar estadísticas
-            instance.actualizar_estadisticas_post_save()
-            # Eliminar el atributo para evitar actualizaciones innecesarias
-            delattr(instance, '_actualizar_estadisticas')
+            
+            # Actualizar estadísticas directamente
+            from .models.estadisticas import EstadisticaEquipo
+            
+            for equipo in [instance.equipo_1, instance.equipo_2]:
+                # Crear o obtener estadísticas del equipo
+                estadistica, created_stat = EstadisticaEquipo.objects.get_or_create(
+                    equipo=equipo,
+                    torneo=instance.torneo,
+                    defaults={
+                        'partidos_jugados': 0,
+                        'partidos_ganados': 0,
+                        'partidos_empatados': 0,
+                        'partidos_perdidos': 0,
+                        'goles_favor': 0,
+                        'goles_contra': 0,
+                        'diferencia_goles': 0,
+                        'puntos': 0,
+                        'tarjetas_amarillas': 0,
+                        'tarjetas_rojas': 0
+                    }
+                )
+                
+                # Actualizar estadísticas
+                estadistica.actualizar_estadisticas()
+                logger.info(f"Estadísticas actualizadas para equipo {equipo.nombre}")
+            
             logger.info(f"Estadísticas actualizadas correctamente para el partido {instance.id}")
+            
         except Exception as e:
             # Capturar cualquier error para que no interrumpa el flujo normal de la aplicación
             logger.error(f"Error al actualizar estadísticas para el partido {instance.id}: {str(e)}")
