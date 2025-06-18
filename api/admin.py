@@ -78,6 +78,10 @@ class FaseEliminatoriaInline(admin.TabularInline):
     fields = ('nombre', 'orden', 'fecha_inicio', 'fecha_fin', 'completada')
     extra = 0
     show_change_link = True
+    
+    def get_queryset(self, request):
+        """Optimize queryset for inline display"""
+        return super().get_queryset(request).select_related('torneo')
 
 
 @admin.register(Torneo)
@@ -160,6 +164,7 @@ class JugadorInline(admin.TabularInline):
     fields = ('primer_nombre', 'primer_apellido', 'cedula', 'posicion', 'numero_dorsal')
     extra = 1
     show_change_link = True
+    ordering = ('numero_dorsal', 'primer_apellido')  # Order by jersey number, then last name
     
     def get_queryset(self, request):
         """Optimize queryset for inline display"""
@@ -227,7 +232,7 @@ class EquipoAdmin(admin.ModelAdmin):
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
         queryset = queryset.annotate(
-            numero_jugadores_count=models.Count('jugadores')
+            numero_jugadores_count=models.Count('jugadores', distinct=True)
         ).select_related('categoria', 'torneo', 'dirigente')
         return queryset
     
