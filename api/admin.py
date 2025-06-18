@@ -20,7 +20,7 @@ from .models.financiero import TransaccionPago, PagoArbitro
 # Importaciones de modelos de participación
 from .models.participacion import ParticipacionJugador
 # Importaciones de modelos de participantes
-from .models.participantes import Equipo, Jugador, Dirigente, Arbitro
+from .models.participantes import Equipo, Jugador, Dirigente, Arbitro, JugadorDocumento
 
 # Configuración del sitio de administración
 admin.site.site_header = 'GoolStar - Administración de Torneos'
@@ -386,6 +386,19 @@ class EquipoAdmin(admin.ModelAdmin):
     descargar_balance_financiero_pdf.short_description = "Descargar balance financiero en PDF"
 
 
+class JugadorDocumentoInline(admin.TabularInline):
+    """Inline para mostrar documentos de jugador en la página de edición del jugador"""
+    model = JugadorDocumento
+    fields = ('tipo_documento', 'archivo_documento', 'estado_verificacion', 'fecha_subida')
+    readonly_fields = ('fecha_subida',)
+    extra = 0
+    show_change_link = True
+    
+    def get_queryset(self, request):
+        """Optimizar queryset para inline display"""
+        return super().get_queryset(request).select_related('jugador')
+
+
 @admin.register(Jugador)
 class JugadorAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'cedula', 'equipo','suspendido', 'activo_segunda_fase')
@@ -395,6 +408,7 @@ class JugadorAdmin(admin.ModelAdmin):
     list_per_page = 25
     list_select_related = ('equipo',)  # Optimización para evitar N+1 queries
     list_editable = ('cedula', 'suspendido', 'activo_segunda_fase')
+    inlines = [JugadorDocumentoInline]
 
     fieldsets = (
         ('Datos personales', {
@@ -416,6 +430,82 @@ class JugadorAdmin(admin.ModelAdmin):
     
     # La validación ha sido desactivada a petición del usuario
     # para permitir equipos con más de 12 jugadores activos
+
+
+@admin.register(JugadorDocumento)
+class JugadorDocumentoAdmin(admin.ModelAdmin):
+    """Administración de documentos de jugadores con soporte para Cloudinary"""
+    list_display = ('jugador', 'tipo_documento', 'estado_verificacion', 'fecha_subida', 'fecha_verificacion', 'mostrar_imagen')
+    list_filter = ('tipo_documento', 'estado_verificacion', 'fecha_subida', 'jugador__equipo')
+    search_fields = ('jugador__primer_nombre', 'jugador__primer_apellido', 'jugador__cedula')
+    date_hierarchy = 'fecha_subida'
+    ordering = ('-fecha_subida',)
+    list_per_page = 25
+    list_select_related = ('jugador', 'jugador__equipo')
+    actions = ['marcar_como_verificados', 'marcar_como_rechazados']
+    
+    fieldsets = (
+        ('Información del documento', {
+            'fields': ('jugador', 'tipo_documento', 'archivo_documento')
+        }),
+        ('Estado de verificación', {
+            'fields': ('estado_verificacion', 'fecha_verificacion')
+        }),
+        ('Metadatos', {
+            'fields': ('fecha_subida', 'verificado_por'),
+            'classes': ('collapse',)
+        }),
+    )
+    
+    readonly_fields = ('fecha_subida',)
+    
+    def mostrar_imagen(self, obj):
+        """Muestra una miniatura de la imagen del documento"""
+        if obj.archivo_documento:
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" width="50" height="50" style="object-fit: cover;" /></a>',
+                obj.url_documento,
+                obj.url_documento
+            )
+        return "Sin imagen"
+    mostrar_imagen.short_description = "Vista previa"
+    
+    def marcar_como_verificados(self, request, queryset):
+        """Marca los documentos seleccionados como verificados"""
+        documentos_actualizados = 0
+        for documento in queryset:
+            if documento.estado_verificacion != JugadorDocumento.EstadoVerificacion.VERIFICADO:
+                documento.marcar_como_verificado(request.user)
+                documentos_actualizados += 1
+        
+        self.message_user(
+            request,
+            f"{documentos_actualizados} documento(s) han sido marcados como verificados."
+        )
+    marcar_como_verificados.short_description = "Marcar documentos como verificados"
+    
+    def marcar_como_rechazados(self, request, queryset):
+        """Marca los documentos seleccionados como rechazados"""
+        documentos_actualizados = 0
+        for documento in queryset:
+            if documento.estado_verificacion != JugadorDocumento.EstadoVerificacion.RECHAZADO:
+                documento.rechazar_documento(
+                    request.user, 
+                    "Documento rechazado desde el panel de administración"
+                )
+                documentos_actualizados += 1
+        
+        self.message_user(
+            request,
+            f"{documentos_actualizados} documento(s) han sido marcados como rechazados."
+        )
+    marcar_como_rechazados.short_description = "Marcar documentos como rechazados"
+    
+    def get_queryset(self, request):
+        """Optimizar consultas para mejor rendimiento"""
+        return super().get_queryset(request).select_related(
+            'jugador', 'jugador__equipo', 'verificado_por'
+        )
 
 
 # -----------------------------------------------------------------------------
