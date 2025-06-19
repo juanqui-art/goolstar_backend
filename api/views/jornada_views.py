@@ -19,8 +19,9 @@ class JornadaViewSet(viewsets.ModelViewSet):
     
     Una jornada agrupa varios partidos dentro de un torneo.
     """
-    queryset = Jornada.objects.all().order_by('numero')
+    queryset = Jornada.objects.all()
     serializer_class = JornadaSerializer
+    ordering = ['numero']  # Orden por defecto: por número de jornada
     permission_classes = [IsAuthenticatedOrReadOnly]
 
     @log_api_request(logger)

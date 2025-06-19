@@ -44,13 +44,14 @@ class JugadorDocumentoViewSet(viewsets.ModelViewSet):
     
     queryset = JugadorDocumento.objects.all().select_related(
         'jugador', 'verificado_por'
-    ).order_by('-fecha_subida')
+    )
     
     serializer_class = JugadorDocumentoSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     pagination_class = StandardResultsSetPagination
     parser_classes = [MultiPartParser, FormParser]  # Para subida de archivos
     filter_backends = [DjangoFilterBackend]
+    ordering = ['-fecha_subida']  # Orden por defecto: documentos más recientes primero
     filterset_fields = {
         'jugador': ['exact'],
         'tipo_documento': ['exact', 'in'],

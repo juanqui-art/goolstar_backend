@@ -37,8 +37,9 @@ class GolViewSet(viewsets.ModelViewSet):
         'partido__equipo_1', 
         'partido__equipo_2', 
         'partido__torneo'
-    ).order_by('-partido__fecha', 'minuto', 'id')
+    )
     serializer_class = GolSerializer
+    ordering = ['-partido__fecha', 'minuto', 'id']  # Orden por defecto: por partido más reciente, luego por minuto
     permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = GolPagination  # Usar paginación específica para mejorar rendimiento
 

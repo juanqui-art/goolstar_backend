@@ -27,10 +27,11 @@ class PartidoViewSet(viewsets.ModelViewSet):
     queryset = Partido.objects.all().select_related('equipo_1', 'equipo_2', 'jornada', 'torneo').prefetch_related(
         'goles__jugador__equipo',  # Optimizar goles con jugador y equipo
         'tarjetas__jugador__equipo'  # Optimizar tarjetas con jugador y equipo
-    ).order_by('-fecha', 'id')
+    )
     serializer_class = PartidoSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     ordering_fields = ['fecha']
+    ordering = ['-fecha', 'id']  # Orden por defecto: partidos más recientes primero
     permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = PageNumberPagination
     

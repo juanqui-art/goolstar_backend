@@ -21,4 +21,5 @@ class CategoriaViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre']
     ordering_fields = ['nombre']
+    ordering = ['nombre']  # Orden por defecto para evitar UnorderedObjectListWarning
     permission_classes = [IsAuthenticatedOrReadOnly]

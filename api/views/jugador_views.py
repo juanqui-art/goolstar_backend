@@ -35,6 +35,7 @@ class JugadorViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['primer_nombre', 'primer_apellido', 'cedula']
     ordering_fields = ['primer_apellido', 'primer_nombre']
+    ordering = ['primer_apellido', 'primer_nombre']  # Orden por defecto para evitar UnorderedObjectListWarning
     permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = StandardResultsSetPagination
     

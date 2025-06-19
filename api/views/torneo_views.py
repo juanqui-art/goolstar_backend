@@ -56,13 +56,14 @@ class TorneoViewSet(viewsets.ModelViewSet):
 
     Un torneo es la competición principal que agrupa equipos, partidos y estadísticas.
     """
-    queryset = Torneo.objects.all().select_related('categoria').order_by('-fecha_inicio')
+    queryset = Torneo.objects.all().select_related('categoria')
     serializer_class = TorneoSerializer
     filter_backends = [DjangoFilterBackend, filters.SearchFilter,
                        filters.OrderingFilter]  # ← MODIFICAR: agregar DjangoFilterBackend
     filterset_fields = ['activo', 'finalizado', 'fase_actual', 'categoria']  # ← LÍNEA 2 NUEVA
     search_fields = ['nombre', 'categoria__nombre']
     ordering_fields = ['nombre', 'fecha_inicio', 'categoria']
+    ordering = ['-fecha_inicio']  # Orden por defecto: torneos más recientes primero
     permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = PageNumberPagination
 

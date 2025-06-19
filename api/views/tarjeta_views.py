@@ -22,6 +22,8 @@ class TarjetaViewSet(viewsets.ModelViewSet):
     serializer_class = TarjetaSerializer
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['jugador__primer_nombre', 'jugador__primer_apellido']
+    ordering_fields = ['fecha', 'tipo']
+    ordering = ['-fecha', 'tipo']  # Orden por defecto: tarjetas más recientes primero, luego por tipo
     permission_classes = [IsAuthenticatedOrReadOnly]
     
     @log_api_request(logger)

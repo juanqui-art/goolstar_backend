@@ -24,6 +24,7 @@ class EquipoViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ['nombre']
     ordering_fields = ['nombre', 'categoria']
+    ordering = ['nombre']  # Orden por defecto para evitar UnorderedObjectListWarning
     permission_classes = [IsAuthenticatedOrReadOnly]
     pagination_class = PageNumberPagination
     
@@ -38,10 +39,10 @@ class EquipoViewSet(viewsets.ModelViewSet):
         """Optimizar queryset según la acción"""
         if self.action == 'retrieve':
             # Para detalle, necesitamos todas las relaciones
-            return Equipo.objects.all().select_related('categoria', 'torneo').prefetch_related('jugadores')
+            return Equipo.objects.all().select_related('categoria', 'torneo').prefetch_related('jugadores').order_by('nombre')
         else:
             # Para listado, solo lo básico
-            return Equipo.objects.all().select_related('categoria', 'torneo')
+            return Equipo.objects.all().select_related('categoria', 'torneo').order_by('nombre')
     
     @log_api_request(logger)
     def list(self, request, *args, **kwargs):
