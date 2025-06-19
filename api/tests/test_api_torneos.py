@@ -85,7 +85,7 @@ class TorneoAPITests(APITestCase):
             torneo=self.torneo1
         )
         
-        # Crear estadísticas para los equipos
+        # Crear estadísticas para los equipos (coherentes con los partidos)
         self.estadistica1 = EstadisticaEquipo.objects.create(
             equipo=self.equipo1,
             torneo=self.torneo1,
@@ -93,10 +93,10 @@ class TorneoAPITests(APITestCase):
             partidos_ganados=1,
             partidos_empatados=1,
             partidos_perdidos=0,
-            goles_favor=5,
-            goles_contra=2,
-            diferencia_goles=3,
-            puntos=4
+            goles_favor=5,  # 3+2 de los partidos
+            goles_contra=3,  # 1+2 de los partidos
+            diferencia_goles=2,  # 5-3
+            puntos=4  # (1×3) + 1
         )
         
         self.estadistica2 = EstadisticaEquipo.objects.create(
@@ -106,14 +106,14 @@ class TorneoAPITests(APITestCase):
             partidos_ganados=0,
             partidos_empatados=1,
             partidos_perdidos=1,
-            goles_favor=2,
-            goles_contra=5,
-            diferencia_goles=-3,
-            puntos=1
+            goles_favor=3,  # 1+2 de los partidos
+            goles_contra=5,  # 3+2 de los partidos
+            diferencia_goles=-2,  # 3-5
+            puntos=1  # (0×3) + 1
         )
         
         # Crear partidos para las pruebas
-        self.partido = Partido.objects.create(
+        self.partido1 = Partido.objects.create(
             torneo=self.torneo1,
             equipo_1=self.equipo1,
             equipo_2=self.equipo2,
@@ -121,6 +121,17 @@ class TorneoAPITests(APITestCase):
             completado=True,
             goles_equipo_1=3,
             goles_equipo_2=1
+        )
+        
+        # Segundo partido empatado para completar las estadísticas esperadas
+        self.partido2 = Partido.objects.create(
+            torneo=self.torneo1,
+            equipo_1=self.equipo2,
+            equipo_2=self.equipo1,
+            fecha=today - timedelta(days=3),
+            completado=True,
+            goles_equipo_1=2,
+            goles_equipo_2=2
         )
 
     def test_listar_torneos(self):
@@ -202,8 +213,8 @@ class TorneoAPITests(APITestCase):
         # Verificar estadísticas generales
         estadisticas = response.data['estadisticas_generales']
         self.assertEqual(estadisticas['total_equipos'], 2)
-        self.assertEqual(estadisticas['total_partidos'], 1)
-        self.assertEqual(estadisticas['partidos_jugados'], 1)
+        self.assertEqual(estadisticas['total_partidos'], 2)  # Actualizado: ahora hay 2 partidos
+        self.assertEqual(estadisticas['partidos_jugados'], 2)  # Actualizado: 2 partidos jugados
         
         # Verificar mejores equipos
         mejores_equipos = response.data['mejores_equipos']
