@@ -18,6 +18,7 @@ from api.serializers import (
     JugadorDocumentoVerificationSerializer,
     JugadorConDocumentosSerializer
 )
+from api.services import DocumentService, ValidationError, BusinessRuleError
 from api.utils.logging_utils import get_logger, log_api_request
 from rest_framework.pagination import PageNumberPagination
 
@@ -45,6 +46,10 @@ class JugadorDocumentoViewSet(viewsets.ModelViewSet):
     queryset = JugadorDocumento.objects.all().select_related(
         'jugador', 'verificado_por'
     )
+    
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.document_service = DocumentService()
     
     serializer_class = JugadorDocumentoSerializer
     permission_classes = [permissions.IsAuthenticatedOrReadOnly]
@@ -142,22 +147,32 @@ class JugadorDocumentoViewSet(viewsets.ModelViewSet):
         
         PATCH /api/jugador-documentos/{id}/verify/
         """
-        documento = self.get_object()
-        logger.info(f"Verificando documento {documento.id} - Usuario: {request.user}")
-        
         comentarios = request.data.get('comentarios_verificacion', '')
         
         try:
-            documento.marcar_como_verificado(request.user, comentarios)
-            logger.info(f"Documento {documento.id} verificado exitosamente")
+            documento = self.document_service.verify_document(
+                document_id=pk,
+                user=request.user,
+                comentarios=comentarios
+            )
             
             serializer = JugadorDocumentoSerializer(documento)
             return Response(serializer.data)
             
-        except Exception as e:
-            logger.error(f"Error al verificar documento {documento.id}: {str(e)}")
+        except ValidationError as e:
             return Response(
-                {'error': f'Error al verificar documento: {str(e)}'},
+                {'error': e.message, 'error_code': e.error_code},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except BusinessRuleError as e:
+            return Response(
+                {'error': e.message, 'error_code': e.error_code},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error inesperado al verificar documento {pk}: {str(e)}")
+            return Response(
+                {'error': 'Error interno del servidor'},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR
             )
     
@@ -169,35 +184,34 @@ class JugadorDocumentoViewSet(viewsets.ModelViewSet):
         
         PATCH /api/jugador-documentos/{id}/reject/
         """
-        documento = self.get_object()
-        logger.info(f"Rechazando documento {documento.id} - Usuario: {request.user}")
+        comentarios = request.data.get('comentarios_verificacion', '')
         
-        serializer = self.get_serializer(documento, data=request.data, partial=True)
-        if serializer.is_valid():
-            comentarios = serializer.validated_data.get('comentarios_verificacion')
+        try:
+            documento = self.document_service.reject_document(
+                document_id=pk,
+                user=request.user,
+                comentarios=comentarios
+            )
             
-            if not comentarios:
-                return Response(
-                    {'error': 'Los comentarios son obligatorios para rechazar un documento'},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
+            serializer = JugadorDocumentoSerializer(documento)
+            return Response(serializer.data)
             
-            try:
-                documento.rechazar_documento(request.user, comentarios)
-                logger.info(f"Documento {documento.id} rechazado exitosamente")
-                
-                response_serializer = JugadorDocumentoSerializer(documento)
-                return Response(response_serializer.data)
-                
-            except Exception as e:
-                logger.error(f"Error al rechazar documento {documento.id}: {str(e)}")
-                return Response(
-                    {'error': f'Error al rechazar documento: {str(e)}'},
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR
-                )
-        
-        logger.warning(f"Error en rechazo de documento: {serializer.errors}")
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except ValidationError as e:
+            return Response(
+                {'error': e.message, 'error_code': e.error_code},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except BusinessRuleError as e:
+            return Response(
+                {'error': e.message, 'error_code': e.error_code},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        except Exception as e:
+            logger.error(f"Error inesperado al rechazar documento {pk}: {str(e)}")
+            return Response(
+                {'error': 'Error interno del servidor'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
     
     @action(detail=False, methods=['get'], url_path='by-jugador/(?P<jugador_id>[^/.]+)')
     @log_api_request(logger)
@@ -257,42 +271,13 @@ class JugadorDocumentoViewSet(viewsets.ModelViewSet):
         
         GET /api/jugador-documentos/stats/
         """
-        logger.info(f"Consultando estadísticas de documentos - Usuario: {request.user}")
-        
-        total_documentos = self.queryset.count()
-        documentos_verificados = self.queryset.filter(
-            estado_verificacion=JugadorDocumento.EstadoVerificacion.VERIFICADO
-        ).count()
-        documentos_pendientes = self.queryset.filter(
-            estado_verificacion=JugadorDocumento.EstadoVerificacion.PENDIENTE
-        ).count()
-        documentos_rechazados = self.queryset.filter(
-            estado_verificacion=JugadorDocumento.EstadoVerificacion.RECHAZADO
-        ).count()
-        
-        # Estadísticas por tipo de documento
-        tipos_stats = {}
-        for tipo_choice in JugadorDocumento.TipoDocumento.choices:
-            tipo_code, tipo_name = tipo_choice
-            count = self.queryset.filter(tipo_documento=tipo_code).count()
-            tipos_stats[tipo_code] = {
-                'nombre': tipo_name,
-                'total': count
-            }
-        
-        stats = {
-            'resumen': {
-                'total_documentos': total_documentos,
-                'documentos_verificados': documentos_verificados,
-                'documentos_pendientes': documentos_pendientes,
-                'documentos_rechazados': documentos_rechazados,
-                'porcentaje_verificados': round(
-                    (documentos_verificados / total_documentos * 100) if total_documentos > 0 else 0, 
-                    2
-                )
-            },
-            'por_tipo': tipos_stats,
-            'ultima_actualizacion': timezone.now().isoformat()
-        }
-        
-        return Response(stats)
+        try:
+            stats = self.document_service.get_documents_statistics()
+            return Response(stats)
+            
+        except Exception as e:
+            logger.error(f"Error al obtener estadísticas de documentos: {str(e)}")
+            return Response(
+                {'error': 'Error interno del servidor'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
