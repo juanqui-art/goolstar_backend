@@ -3,15 +3,16 @@ Tests para los endpoints de la API de Torneos.
 """
 
 from datetime import date, timedelta
+
+from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
-from django.contrib.auth.models import User
 
 from api.models.base import Torneo, Categoria
-from api.models.participantes import Equipo
-from api.models.estadisticas import EstadisticaEquipo
 from api.models.competicion import Partido
+from api.models.estadisticas import EstadisticaEquipo
+from api.models.participantes import Equipo
 
 
 class TorneoAPITests(APITestCase):
@@ -23,26 +24,26 @@ class TorneoAPITests(APITestCase):
         """Configuración inicial para las pruebas."""
         # Crear un usuario para autenticación
         self.user = User.objects.create_user(
-            username='testuser', 
+            username='testuser',
             password='testpassword',
             is_staff=True
         )
         # Autenticar al cliente para las pruebas
         self.client.force_authenticate(user=self.user)
-        
+
         # Crear categorías para las pruebas
         self.categoria1 = Categoria.objects.create(
-            nombre='Varones', 
+            nombre='Varones',
             descripcion='Categoría masculina'
         )
         self.categoria2 = Categoria.objects.create(
-            nombre='Damas', 
+            nombre='Damas',
             descripcion='Categoría femenina'
         )
-        
+
         # Fechas para los torneos
         today = date.today()
-        
+
         # Crear torneos para las pruebas
         self.torneo1 = Torneo.objects.create(
             nombre='Torneo de Prueba 1',
@@ -51,7 +52,7 @@ class TorneoAPITests(APITestCase):
             activo=True,
             finalizado=False
         )
-        
+
         self.torneo2 = Torneo.objects.create(
             nombre='Torneo de Prueba 2',
             categoria=self.categoria2,
@@ -60,7 +61,7 @@ class TorneoAPITests(APITestCase):
             activo=True,
             finalizado=False
         )
-        
+
         self.torneo_inactivo = Torneo.objects.create(
             nombre='Torneo Inactivo',
             categoria=self.categoria1,
@@ -69,7 +70,7 @@ class TorneoAPITests(APITestCase):
             activo=False,
             finalizado=True
         )
-        
+
         # Crear equipos para las pruebas
         self.equipo1 = Equipo.objects.create(
             nombre='Equipo 1',
@@ -77,14 +78,14 @@ class TorneoAPITests(APITestCase):
             grupo='A',
             torneo=self.torneo1
         )
-        
+
         self.equipo2 = Equipo.objects.create(
             nombre='Equipo 2',
             categoria=self.categoria1,
             grupo='A',
             torneo=self.torneo1
         )
-        
+
         # Crear estadísticas para los equipos (coherentes con los partidos)
         self.estadistica1 = EstadisticaEquipo.objects.create(
             equipo=self.equipo1,
@@ -98,7 +99,7 @@ class TorneoAPITests(APITestCase):
             diferencia_goles=2,  # 5-3
             puntos=4  # (1×3) + 1
         )
-        
+
         self.estadistica2 = EstadisticaEquipo.objects.create(
             equipo=self.equipo2,
             torneo=self.torneo1,
@@ -111,7 +112,7 @@ class TorneoAPITests(APITestCase):
             diferencia_goles=-2,  # 3-5
             puntos=1  # (0×3) + 1
         )
-        
+
         # Crear partidos para las pruebas
         self.partido1 = Partido.objects.create(
             torneo=self.torneo1,
@@ -122,7 +123,7 @@ class TorneoAPITests(APITestCase):
             goles_equipo_1=3,
             goles_equipo_2=1
         )
-        
+
         # Segundo partido empatado para completar las estadísticas esperadas
         self.partido2 = Partido.objects.create(
             torneo=self.torneo1,
@@ -148,7 +149,7 @@ class TorneoAPITests(APITestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(response.data['nombre'], 'Torneo de Prueba 1')
-        
+
         # Verificar que se use TorneoDetalleSerializer
         self.assertIn('categoria', response.data)
         self.assertIn('total_equipos', response.data)
@@ -161,7 +162,7 @@ class TorneoAPITests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         # Actualizado para reflejar el número real de torneos activos
         self.assertTrue(len(response.data) > 0, "Debe haber al menos un torneo activo")
-        
+
         # Verificar que no incluye el torneo inactivo
         torneos_ids = [t['id'] for t in response.data]
         # Verificar que al menos uno de los torneos activos está en la respuesta
@@ -176,15 +177,15 @@ class TorneoAPITests(APITestCase):
         url = reverse('torneo-tabla-posiciones', args=[self.torneo1.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
+
         # Verificar estructura de la respuesta
         self.assertIn('grupo', response.data)
         self.assertIn('equipos', response.data)
-        
+
         # Verificar los equipos en la tabla
         equipos = response.data['equipos']
         self.assertEqual(len(equipos), 2)
-        
+
         # Verificar orden por puntos (primero el que tiene más puntos)
         self.assertEqual(equipos[0]['equipo'], self.equipo1.id)
         self.assertEqual(equipos[0]['puntos'], 4)
@@ -204,18 +205,18 @@ class TorneoAPITests(APITestCase):
         url = reverse('torneo-estadisticas', args=[self.torneo1.id])
         response = self.client.get(url)
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        
+
         # Verificar estructura de la respuesta
         self.assertIn('torneo', response.data)
         self.assertIn('estadisticas_generales', response.data)
         self.assertIn('mejores_equipos', response.data)
-        
+
         # Verificar estadísticas generales
         estadisticas = response.data['estadisticas_generales']
         self.assertEqual(estadisticas['total_equipos'], 2)
         self.assertEqual(estadisticas['total_partidos'], 2)  # Actualizado: ahora hay 2 partidos
         self.assertEqual(estadisticas['partidos_jugados'], 2)  # Actualizado: 2 partidos jugados
-        
+
         # Verificar mejores equipos
         mejores_equipos = response.data['mejores_equipos']
         self.assertEqual(mejores_equipos['equipo_mas_goleador']['nombre'], 'Equipo 1')

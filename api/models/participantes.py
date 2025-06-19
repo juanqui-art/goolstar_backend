@@ -3,14 +3,14 @@ Modelos de participantes para el sistema GoolStar.
 Incluye equipos, jugadores, dirigentes y árbitros.
 """
 
-from django.db import models
-from django.core.validators import MinValueValidator
-from django.utils.translation import gettext_lazy as _
-from django.utils import timezone
-from django.db.models import Sum
 from decimal import Decimal
-from django.db import transaction
+
 from cloudinary.models import CloudinaryField
+from django.db import models
+from django.db import transaction
+from django.db.models import Sum
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
 
 from .base import Categoria, Torneo, Nivel
 from ..validators import validate_document_file
@@ -78,7 +78,8 @@ class Equipo(models.Model):
         """Calcula la deuda total del equipo usando transacciones"""
         from .financiero import TransaccionPago
         total_inscripcion = self.get_total_inscripcion()
-        abonos = TransaccionPago.objects.filter(equipo=self, tipo='abono_inscripcion').aggregate(total=Sum('monto'))['total'] or 0
+        abonos = TransaccionPago.objects.filter(equipo=self, tipo='abono_inscripcion').aggregate(total=Sum('monto'))[
+                     'total'] or 0
         return total_inscripcion - abonos
 
     @property
@@ -140,7 +141,7 @@ class Equipo(models.Model):
 
     def registrar_abono(self, monto, concepto="Abono a inscripción",
                         observaciones="", metodo_pago="efectivo", fecha_real=None):
-        from .financiero import TransaccionPago, TipoTransaccion, MetodoPago
+        from .financiero import TransaccionPago, TipoTransaccion
 
         if monto <= 0:
             raise ValueError("El monto debe ser mayor que cero")
@@ -335,38 +336,38 @@ class JugadorDocumento(models.Model):
     Modelo para almacenar documentos de identidad de jugadores (DNI, cédula).
     Utiliza Cloudinary para almacenamiento seguro en la nube.
     """
-    
+
     # Tipos de documentos permitidos
     class TipoDocumento(models.TextChoices):
         DNI_FRONTAL = 'dni_frontal', 'DNI - Frontal'
-        DNI_POSTERIOR = 'dni_posterior', 'DNI - Posterior' 
+        DNI_POSTERIOR = 'dni_posterior', 'DNI - Posterior'
         CEDULA_FRONTAL = 'cedula_frontal', 'Cédula - Frontal'
         CEDULA_POSTERIOR = 'cedula_posterior', 'Cédula - Posterior'
         PASAPORTE = 'pasaporte', 'Pasaporte'
         OTRO = 'otro', 'Otro documento'
-    
+
     # Estados de verificación
     class EstadoVerificacion(models.TextChoices):
         PENDIENTE = 'pendiente', 'Pendiente'
         VERIFICADO = 'verificado', 'Verificado'
         RECHAZADO = 'rechazado', 'Rechazado'
         RESUBIR = 'resubir', 'Requiere resubir'
-    
+
     # Relación con jugador
     jugador = models.ForeignKey(
-        Jugador, 
+        Jugador,
         on_delete=models.CASCADE,
         related_name='documentos',
         verbose_name='Jugador'
     )
-    
+
     # Tipo de documento
     tipo_documento = models.CharField(
         max_length=20,
         choices=TipoDocumento.choices,
         verbose_name='Tipo de documento'
     )
-    
+
     # Archivo del documento usando Cloudinary
     archivo_documento = CloudinaryField(
         folder='goolstar_documentos',
@@ -375,7 +376,7 @@ class JugadorDocumento(models.Model):
         verbose_name='Archivo del documento',
         help_text='Formatos permitidos: JPG, PNG, PDF. Tamaño máximo: 5MB'
     )
-    
+
     # Estado de verificación
     estado_verificacion = models.CharField(
         max_length=15,
@@ -383,7 +384,7 @@ class JugadorDocumento(models.Model):
         default=EstadoVerificacion.PENDIENTE,
         verbose_name='Estado de verificación'
     )
-    
+
     # Metadatos de verificación
     verificado_por = models.ForeignKey(
         'auth.User',
@@ -393,65 +394,65 @@ class JugadorDocumento(models.Model):
         related_name='documentos_verificados',
         verbose_name='Verificado por'
     )
-    
+
     fecha_verificacion = models.DateTimeField(
         null=True,
         blank=True,
         verbose_name='Fecha de verificación'
     )
-    
+
     comentarios_verificacion = models.TextField(
         blank=True,
         verbose_name='Comentarios de verificación',
         help_text='Comentarios sobre la verificación o razones de rechazo'
     )
-    
+
     # Timestamps
     fecha_subida = models.DateTimeField(
         auto_now_add=True,
         verbose_name='Fecha de subida'
     )
-    
+
     fecha_actualizacion = models.DateTimeField(
         auto_now=True,
         verbose_name='Última actualización'
     )
-    
+
     # Metadata del archivo
     tamaño_archivo = models.PositiveIntegerField(
         null=True,
         blank=True,
         verbose_name='Tamaño del archivo (bytes)'
     )
-    
+
     formato_archivo = models.CharField(
         max_length=10,
         blank=True,
         verbose_name='Formato del archivo'
     )
-    
+
     def __str__(self):
         return f"{self.jugador.nombre_completo} - {self.get_tipo_documento_display()}"
-    
+
     @property
     def tamaño_archivo_mb(self):
         """Retorna el tamaño del archivo en MB."""
         if self.tamaño_archivo:
             return round(self.tamaño_archivo / (1024 * 1024), 2)
         return None
-    
+
     @property
     def url_documento(self):
         """Retorna la URL segura del documento en Cloudinary."""
         if self.archivo_documento:
             return self.archivo_documento.url
         return None
-    
+
     @property
     def esta_verificado(self):
         """Verifica si el documento está verificado."""
         return self.estado_verificacion == self.EstadoVerificacion.VERIFICADO
-    
+
     def marcar_como_verificado(self, usuario, comentarios=''):
         """
         Marca el documento como verificado.
@@ -461,13 +462,13 @@ class JugadorDocumento(models.Model):
             comentarios: Comentarios opcionales sobre la verificación
         """
         from django.utils import timezone
-        
+
         self.estado_verificacion = self.EstadoVerificacion.VERIFICADO
         self.verificado_por = usuario
         self.fecha_verificacion = timezone.now()
         self.comentarios_verificacion = comentarios
         self.save()
-    
+
     def rechazar_documento(self, usuario, comentarios):
         """
         Rechaza el documento con comentarios.
@@ -477,32 +478,32 @@ class JugadorDocumento(models.Model):
             comentarios: Razón del rechazo (obligatorio)
         """
         from django.utils import timezone
-        
+
         self.estado_verificacion = self.EstadoVerificacion.RECHAZADO
         self.verificado_por = usuario
         self.fecha_verificacion = timezone.now()
         self.comentarios_verificacion = comentarios
         self.save()
-    
+
     def save(self, *args, **kwargs):
         """Override save para extraer metadata del archivo."""
         if self.archivo_documento and hasattr(self.archivo_documento, 'file'):
             # Extraer información del archivo
             if hasattr(self.archivo_documento.file, 'size'):
                 self.tamaño_archivo = self.archivo_documento.file.size
-            
+
             # Extraer formato del archivo
             if hasattr(self.archivo_documento.file, 'name'):
                 import os
                 _, ext = os.path.splitext(self.archivo_documento.file.name)
                 self.formato_archivo = ext.lower().replace('.', '')
-        
+
         super().save(*args, **kwargs)
-    
+
     class Meta:
         verbose_name = "Documento de Jugador"
         verbose_name_plural = "Documentos de Jugadores"
-        
+
         # Constraint para evitar documentos duplicados del mismo tipo
         constraints = [
             models.UniqueConstraint(
@@ -511,13 +512,13 @@ class JugadorDocumento(models.Model):
                 condition=models.Q(estado_verificacion__in=['pendiente', 'verificado'])
             )
         ]
-        
+
         # Índices para mejorar rendimiento
         indexes = [
             models.Index(fields=['jugador', 'estado_verificacion']),
             models.Index(fields=['fecha_subida']),
             models.Index(fields=['tipo_documento']),
         ]
-        
+
         # Ordenamiento por defecto
         ordering = ['-fecha_subida']

@@ -3,12 +3,11 @@ Modelos base para el sistema GoolStar.
 Incluye categorías, niveles y configuración de torneos.
 """
 
-from django.db import models
-from django.core.validators import MinValueValidator
-from django.utils.translation import gettext_lazy as _
-from django.core.exceptions import ValidationError
-from django.utils import timezone
 from decimal import Decimal
+
+from django.core.validators import MinValueValidator
+from django.db import models
+from django.utils.translation import gettext_lazy as _
 
 
 class Nivel(models.IntegerChoices):
@@ -35,9 +34,12 @@ class Categoria(models.Model):
     costo_inscripcion = models.DecimalField(max_digits=8, decimal_places=2, blank=True, null=True,
                                             validators=[MinValueValidator(Decimal('0'))])
     # Campos para configuración del torneo
-    costo_arbitraje = models.DecimalField(max_digits=6, decimal_places=2, default=10.00, validators=[MinValueValidator(Decimal('0'))])
-    multa_amarilla = models.DecimalField(max_digits=6, decimal_places=2, default=2.00, validators=[MinValueValidator(Decimal('0'))])
-    multa_roja = models.DecimalField(max_digits=6, decimal_places=2, default=3.00, validators=[MinValueValidator(Decimal('0'))])
+    costo_arbitraje = models.DecimalField(max_digits=6, decimal_places=2, default=10.00,
+                                          validators=[MinValueValidator(Decimal('0'))])
+    multa_amarilla = models.DecimalField(max_digits=6, decimal_places=2, default=2.00,
+                                         validators=[MinValueValidator(Decimal('0'))])
+    multa_roja = models.DecimalField(max_digits=6, decimal_places=2, default=3.00,
+                                     validators=[MinValueValidator(Decimal('0'))])
     limite_inasistencias = models.PositiveSmallIntegerField(default=3)
     limite_amarillas_suspension = models.PositiveSmallIntegerField(default=3)
     partidos_suspension_roja = models.PositiveSmallIntegerField(default=2)
@@ -103,12 +105,12 @@ class Torneo(models.Model):
         clasificados = []
         for grupo in ['A', 'B', 'C', 'D'][:self.numero_grupos]:
             equipos_grupo = self.equipos.filter(
-                grupo=grupo, 
+                grupo=grupo,
                 activo=True
             ).order_by('-estadisticas__puntos', '-estadisticas__diferencia_goles', '-estadisticas__goles_favor')
-            
+
             clasificados.extend(list(equipos_grupo[:self.equipos_clasifican_por_grupo]))
-        
+
         return clasificados
 
     class Meta:

@@ -3,9 +3,8 @@ Modelos de participación para el sistema GoolStar.
 Incluye registros de participación de jugadores en partidos.
 """
 
-from django.db import models
 from django.core.exceptions import ValidationError
-from django.utils.translation import gettext_lazy as _
+from django.db import models
 
 from .participantes import Jugador
 
@@ -18,7 +17,7 @@ class ParticipacionJugador(models.Model):
     jugador = models.ForeignKey(Jugador, on_delete=models.CASCADE, related_name='participaciones')
     es_titular = models.BooleanField(default=True)
     numero_dorsal = models.PositiveSmallIntegerField()
-    
+
     # Campos para control de entrada/salida
     minuto_entra = models.PositiveSmallIntegerField(blank=True, null=True)
     minuto_sale = models.PositiveSmallIntegerField(blank=True, null=True)
@@ -33,28 +32,28 @@ class ParticipacionJugador(models.Model):
         # Validar que el jugador pertenezca a uno de los equipos del partido
         if self.jugador.equipo != self.partido.equipo_1 and self.jugador.equipo != self.partido.equipo_2:
             raise ValidationError("El jugador debe pertenecer a uno de los equipos del partido")
-        
+
         # Validar que el jugador no esté suspendido
         if self.jugador.suspendido:
             raise ValidationError("El jugador está suspendido y no puede participar")
-        
+
         # Validar que el número de dorsal coincida con el registrado para el jugador
         if self.numero_dorsal != self.jugador.numero_dorsal:
             raise ValidationError("El número de dorsal debe coincidir con el registrado para el jugador")
-        
+
         # Validar minutos de entrada/salida
         if self.minuto_entra is not None and self.minuto_sale is not None:
             if self.minuto_entra >= self.minuto_sale:
                 raise ValidationError("El minuto de entrada debe ser menor al minuto de salida")
-        
+
         # Validar que si es titular, no tenga minuto de entrada
         if self.es_titular and self.minuto_entra is not None:
             raise ValidationError("Un jugador titular no debe tener minuto de entrada")
-        
+
         # Validar que si no es titular, tenga minuto de entrada
         if not self.es_titular and self.minuto_entra is None:
             raise ValidationError("Un jugador suplente debe tener minuto de entrada")
-        
+
         # Validar que si tiene motivo de salida, tenga minuto de salida
         if self.motivo_salida and self.minuto_sale is None:
             raise ValidationError("Si se especifica motivo de salida, debe indicarse el minuto de salida")
@@ -63,7 +62,7 @@ class ParticipacionJugador(models.Model):
         # Validar límite de cambios si es un nuevo registro
         if not self.pk and not self.es_titular:
             self.validar_limite_cambios()
-            
+
         # Guardar el registro
         super().save(*args, **kwargs)
 
@@ -72,7 +71,7 @@ class ParticipacionJugador(models.Model):
         # Contar cambios ya realizados por el equipo
         equipo = self.jugador.equipo
         cambios_realizados = self.partido.get_cambios_realizados(equipo)
-        
+
         # Verificar si se excede el límite
         if cambios_realizados >= 3:
             raise ValidationError(f"El equipo {equipo.nombre} ya ha realizado el máximo de 3 cambios permitidos")

@@ -5,12 +5,13 @@ Este comando puede configurarse para ejecutarse de forma programada y enviar
 alertas por email cuando se detecten problemas en los logs del sistema.
 """
 import logging
-import datetime
-from django.core.management.base import BaseCommand
+
 from django.conf import settings
 from django.core.mail import send_mail
-from api.utils.log_analyzer import LogAnalyzer
+from django.core.management.base import BaseCommand
+
 from api.utils.date_utils import get_today_date
+from api.utils.log_analyzer import LogAnalyzer
 from api.utils.tz_logging import log_timezone_operation
 
 
@@ -98,35 +99,37 @@ class Command(BaseCommand):
             should_alert = True
             alert_reasons.append(f"Se encontraron {error_count} errores (umbral: {error_threshold})")
             self.stdout.write(self.style.WARNING(f'⚠️ Umbral de errores superado: {error_count} >= {error_threshold}'))
-        
+
         if len(naive_datetime_issues) >= timezone_threshold:
             should_alert = True
-            alert_reasons.append(f"Se encontraron {len(naive_datetime_issues)} problemas de zona horaria (umbral: {timezone_threshold})")
-            self.stdout.write(self.style.WARNING(f'⚠️ Umbral de problemas de zona horaria superado: {len(naive_datetime_issues)} >= {timezone_threshold}'))
+            alert_reasons.append(
+                f"Se encontraron {len(naive_datetime_issues)} problemas de zona horaria (umbral: {timezone_threshold})")
+            self.stdout.write(self.style.WARNING(
+                f'⚠️ Umbral de problemas de zona horaria superado: {len(naive_datetime_issues)} >= {timezone_threshold}'))
 
         # Enviar email si es necesario
         if should_alert and email_enabled and recipients:
             recipient_list = [email.strip() for email in recipients.split(',')]
-            
+
             # Construir el contenido del email
             subject = f'[GoolStar] Alerta: Problemas detectados en los logs - {today}'
-            
+
             message = "Se han detectado los siguientes problemas en los logs de GoolStar:\n\n"
             for reason in alert_reasons:
                 message += f"- {reason}\n"
-            
+
             message += "\n=== Detalle de errores más comunes ===\n"
             for error in errors[:5]:  # Mostrar los 5 errores más comunes
                 message += f"- {error['message']} ({error['count']} ocurrencias)\n"
-            
+
             if naive_datetime_issues:
                 message += "\n=== Ejemplos de problemas con fechas ===\n"
                 for issue in naive_datetime_issues[:3]:  # Mostrar hasta 3 ejemplos
                     message += f"- {issue['timestamp']}: {issue['message']}\n"
                     message += f"  En archivo: {issue['file']} (línea {issue['line']})\n"
-            
+
             message += "\nEste mensaje ha sido generado automáticamente por el sistema de monitoreo de logs de GoolStar."
-            
+
             try:
                 send_mail(
                     subject,
@@ -138,11 +141,12 @@ class Command(BaseCommand):
                 self.stdout.write(self.style.SUCCESS(f'✅ Alerta enviada a {", ".join(recipient_list)}'))
             except Exception as e:
                 self.stdout.write(self.style.ERROR(f'❌ Error al enviar email: {str(e)}'))
-        
+
         elif should_alert:
-            self.stdout.write(self.style.WARNING('⚠️ Se deben enviar alertas, pero el envío por email no está habilitado'))
-        
+            self.stdout.write(
+                self.style.WARNING('⚠️ Se deben enviar alertas, pero el envío por email no está habilitado'))
+
         else:
             self.stdout.write(self.style.SUCCESS('✅ No se detectaron problemas que requieran alertas'))
-        
+
         return 0

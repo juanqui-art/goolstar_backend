@@ -107,7 +107,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1 año
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
-    
+
     # Headers básicos de seguridad
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
@@ -222,8 +222,6 @@ MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
 
 # Configuración de Cloudinary para documentos de jugadores
-import cloudinary
-import cloudinary.uploader
 import cloudinary.api
 
 CLOUDINARY_STORAGE = {
@@ -413,12 +411,12 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle'
     ],
-     'DEFAULT_THROTTLE_RATES': {
-          'anon': '1000/hour',    # ✅ Aumentado de 100 a 1000
-          'user': '5000/hour',    # ✅ Aumentado de 1000 a 5000
-          'login': '20/min',      # ✅ Aumentado de 5 a 20
-          'register': '10/min',   # ✅ Aumentado de 3 a 10
-      }
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '1000/hour',  # ✅ Aumentado de 100 a 1000
+        'user': '5000/hour',  # ✅ Aumentado de 1000 a 5000
+        'login': '20/min',  # ✅ Aumentado de 5 a 20
+        'register': '10/min',  # ✅ Aumentado de 3 a 10
+    }
 }
 SPECTACULAR_SETTINGS = {
     'TITLE': 'GoolStar API',
@@ -497,10 +495,10 @@ else:
 
 # Configuración específica de cache
 CACHE_TTL = {
-    'tabla_posiciones': 300,     # 5 minutos - se actualiza frecuentemente
+    'tabla_posiciones': 300,  # 5 minutos - se actualiza frecuentemente
     'estadisticas_equipo': 600,  # 10 minutos 
-    'partidos_proximos': 180,    # 3 minutos - información crítica
-    'equipos_categoria': 1800,   # 30 minutos - cambia poco
-    'jugadores_equipo': 900,     # 15 minutos
-    'torneo_detalle': 3600,      # 1 hora - información estable
+    'partidos_proximos': 180,  # 3 minutos - información crítica
+    'equipos_categoria': 1800,  # 30 minutos - cambia poco
+    'jugadores_equipo': 900,  # 15 minutos
+    'torneo_detalle': 3600,  # 1 hora - información estable
 }

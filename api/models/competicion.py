@@ -54,7 +54,8 @@ class Partido(models.Model):
         ('sancion', 'Sanción administrativa')
     ]
     victoria_por_default = models.CharField(max_length=20, choices=MOTIVO_VICTORIA_CHOICES, blank=True)
-    equipo_ganador_default = models.ForeignKey(Equipo, on_delete=models.SET_NULL, null=True, blank=True, related_name='victorias_por_default')
+    equipo_ganador_default = models.ForeignKey(Equipo, on_delete=models.SET_NULL, null=True, blank=True,
+                                               related_name='victorias_por_default')
 
     # Campos para partidos de eliminación directa
     es_eliminatorio = models.BooleanField(default=False)
@@ -86,7 +87,8 @@ class Partido(models.Model):
                 "Un partido no puede pertenecer a una jornada y a una fase eliminatoria simultáneamente")
 
         # Validar que los equipos sean diferentes, solo si ambos están establecidos
-        if hasattr(self, 'equipo_1') and hasattr(self, 'equipo_2') and self.equipo_1 is not None and self.equipo_2 is not None:
+        if hasattr(self, 'equipo_1') and hasattr(self,
+                                                 'equipo_2') and self.equipo_1 is not None and self.equipo_2 is not None:
             if self.equipo_1 == self.equipo_2:
                 raise ValidationError("Los equipos deben ser diferentes")
 
@@ -106,7 +108,7 @@ class Partido(models.Model):
 
         # Guardar el partido
         super().save(*args, **kwargs)
-        
+
         # Marcamos si el partido fue completado para que lo procese la señal post_save
         if is_newly_completed:
             self._actualizar_estadisticas = True
@@ -116,7 +118,7 @@ class Partido(models.Model):
         diseñado para ser llamado desde una señal post_save"""
         from .estadisticas import EstadisticaEquipo
         from django.db import transaction
-        
+
         # Usar transacción atómica para la actualización completa
         with transaction.atomic():
             # Asegurar que existen las estadísticas para ambos equipos
