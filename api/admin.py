@@ -7,7 +7,6 @@ from xhtml2pdf import pisa
 from io import BytesIO
 from django.db import models
 from django.utils import timezone
-from django.contrib import messages
 
 # Importaciones de modelos base
 from .models.base import Categoria, Torneo, FaseEliminatoria
@@ -519,13 +518,17 @@ class GolInline(admin.TabularInline):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         # Solo filtramos si estamos editando un Partido existente y el campo es 'jugador'
         if db_field.name == "jugador":
-            # Obtenemos el partido desde el parent_obj (el objeto que está siendo editado)
-            partido = self.parent_obj
-            if partido and partido.pk:
-                # Filtramos jugadores que pertenecen a los equipos del partido - optimized
-                kwargs["queryset"] = Jugador.objects.filter(
-                    equipo__in=[partido.equipo_1, partido.equipo_2]
-                ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
+            # Intentamos obtener el ID del partido desde la URL
+            partido_id = request.resolver_match.kwargs.get('object_id')
+            if partido_id:
+                try:
+                    partido = Partido.objects.get(pk=partido_id)
+                    # Filtramos jugadores que pertenecen a los equipos del partido
+                    kwargs["queryset"] = Jugador.objects.filter(
+                        equipo__in=[partido.equipo_1, partido.equipo_2]
+                    ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
+                except Partido.DoesNotExist:
+                    pass  # Si no existe el partido, no filtramos
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
@@ -536,13 +539,17 @@ class TarjetaInline(admin.TabularInline):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         # Solo filtramos si estamos editando un Partido existente y el campo es 'jugador'
         if db_field.name == "jugador":
-            # Obtenemos el partido desde el parent_obj (el objeto que está siendo editado)
-            partido = self.parent_obj
-            if partido and partido.pk:
-                # Filtramos jugadores que pertenecen a los equipos del partido - optimized
-                kwargs["queryset"] = Jugador.objects.filter(
-                    equipo__in=[partido.equipo_1, partido.equipo_2]
-                ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
+            # Intentamos obtener el ID del partido desde la URL
+            partido_id = request.resolver_match.kwargs.get('object_id')
+            if partido_id:
+                try:
+                    partido = Partido.objects.get(pk=partido_id)
+                    # Filtramos jugadores que pertenecen a los equipos del partido
+                    kwargs["queryset"] = Jugador.objects.filter(
+                        equipo__in=[partido.equipo_1, partido.equipo_2]
+                    ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
+                except Partido.DoesNotExist:
+                    pass  # Si no existe el partido, no filtramos
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
@@ -553,13 +560,17 @@ class CambioJugadorInline(admin.TabularInline):
     def formfield_for_foreignkey(self, db_field, request, **kwargs):
         # Solo filtramos para los campos de jugadores
         if db_field.name in ["jugador_sale", "jugador_entra"]:
-            # Obtenemos el partido desde el parent_obj (el objeto que está siendo editado)
-            partido = self.parent_obj
-            if partido and partido.pk:
-                # Filtramos jugadores que pertenecen a los equipos del partido - optimized
-                kwargs["queryset"] = Jugador.objects.filter(
-                    equipo__in=[partido.equipo_1, partido.equipo_2]
-                ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
+            # Intentamos obtener el ID del partido desde la URL
+            partido_id = request.resolver_match.kwargs.get('object_id')
+            if partido_id:
+                try:
+                    partido = Partido.objects.get(pk=partido_id)
+                    # Filtramos jugadores que pertenecen a los equipos del partido
+                    kwargs["queryset"] = Jugador.objects.filter(
+                        equipo__in=[partido.equipo_1, partido.equipo_2]
+                    ).select_related('equipo').order_by('equipo__nombre', 'primer_apellido')
+                except Partido.DoesNotExist:
+                    pass  # Si no existe el partido, no filtramos
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
@@ -616,7 +627,7 @@ class EquipoFilter(SimpleListFilter):
 class PartidoAdmin(admin.ModelAdmin):
     form = PartidoForm
     list_display = ('__str__', 'jornada', 'fecha', 'goles_equipo_1', 'goles_equipo_2', 'completado', 'mostrar_victoria_default')
-    list_filter = (EquipoFilter, 'jornada', 'completado', 'equipo_1__categoria', 'torneo', 'equipo_1__grupo', 'fase_eliminatoria', 'victoria_por_default')
+    list_filter = (EquipoFilter, 'jornada', 'completado', 'torneo', 'fase_eliminatoria', 'victoria_por_default')
     search_fields = ('equipo_1__nombre', 'equipo_2__nombre', 'arbitro__nombres', 'arbitro__apellidos', 'cancha')
     date_hierarchy = 'fecha'
     ordering = ('-fecha',)
@@ -625,14 +636,6 @@ class PartidoAdmin(admin.ModelAdmin):
     list_select_related = ('jornada', 'equipo_1', 'equipo_2', 'arbitro', 'torneo', 'fase_eliminatoria', 'equipo_ganador_default')
     actions = ['marcar_como_completados']
     
-    def get_formsets_with_inlines(self, request, obj=None):
-        """
-        Proporciona el objeto Partido a los inlines para que puedan filtrar jugadores
-        """
-        for inline in self.get_inline_instances(request, obj):
-            # Guardamos el objeto padre (partido) en cada inline
-            inline.parent_obj = obj
-            yield inline.get_formset(request, obj), inline
     
     fieldsets = (
         ('Información general', {
@@ -727,7 +730,7 @@ class TarjetaAdmin(admin.ModelAdmin):
     list_select_related = ('jugador', 'partido')  # Optimización para evitar N+1 queries
     actions = ['marcar_como_pagadas']
 
-    def marcar_como_pagadas(self, request, queryset):
+    def marcar_como_pagadas(self, _, queryset):
         queryset.update(pagada=True)
 
     marcar_como_pagadas.short_description = "Marcar tarjetas seleccionadas como pagadas"
@@ -814,7 +817,7 @@ class PagoArbitroAdmin(admin.ModelAdmin):
     list_select_related = ('arbitro', 'partido', 'equipo')  # Optimización para evitar N+1 queries
     actions = ['marcar_como_pagados']
 
-    def marcar_como_pagados(self, request, queryset):
+    def marcar_como_pagados(self, _, queryset):
         from django.utils import timezone
         queryset.update(pagado=True, fecha_pago=timezone.now())
 
