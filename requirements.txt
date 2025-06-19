@@ -1,10 +1,10 @@
 # Paquetes principales
-Django==5.2
+Django==5.2.3
 djangorestframework==3.15.2
-django-filter==24.1  # Agregado para DjangoFilterBackend
+django-filter==25.1  # Agregado para DjangoFilterBackend
 
 # Base de datos
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 dj-database-url==2.1.0
 
 # Autenticación y seguridad
