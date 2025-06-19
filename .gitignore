@@ -83,3 +83,5 @@ coverage.xml
 *.sublime-workspace
 
 CLAUDE.md
+/ADMIN_PERFORMANCE_SUMMARY.md
+/api/admin_performance_notes.md
