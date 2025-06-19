@@ -7,7 +7,7 @@ importar directamente desde los módulos correspondientes en api.views.
 """
 
 # Importamos todos los ViewSets desde el paquete de vistas
-from api.views import (
+from .views import (
     CategoriaViewSet,
     EquipoViewSet,
     JugadorViewSet,
