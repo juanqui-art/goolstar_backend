@@ -75,10 +75,7 @@
 **/*.bak
 **/*.tmp
 
-**/.idea
-**/.vscode
-**/*.sublime-project
-**/*.sublime-workspace
+
 
 # flyctl launch added from .idea/.gitignore
 # Default ignored files

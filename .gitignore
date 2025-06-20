@@ -52,8 +52,6 @@ static/
 # */migrations/*.py
 */migrations/__pycache__/
 
-# Archivos de imágenes y archivos subidos por usuarios
-media/
 
 # Archivos del sistema operativo
 .DS_Store
@@ -77,10 +75,6 @@ coverage.xml
 *.bak
 *.tmp
 
-.idea/
-.vscode/
-*.sublime-project
-*.sublime-workspace
 
 CLAUDE.md
 /ADMIN_PERFORMANCE_SUMMARY.md

@@ -63,7 +63,7 @@ class FaseEliminatoriaInline(admin.TabularInline):
     fields = ('nombre', 'orden', 'fecha_inicio', 'fecha_fin', 'completada')
     extra = 0
     show_change_link = True
-    
+
     def get_queryset(self, request):
         """Optimize queryset for inline display"""
         return super().get_queryset(request).select_related('torneo')
@@ -98,10 +98,10 @@ class TorneoAdmin(admin.ModelAdmin):
         grupos_conteo = obj.equipos.filter(activo=True).values('grupo').annotate(
             count=models.Count('id')
         ).order_by('grupo')
-        
+
         # Convert to dict for easy lookup
         grupos_dict = {g['grupo']: g['count'] for g in grupos_conteo if g['grupo']}
-        
+
         # Build result for configured number of groups
         resultado = []
         for letra in ['A', 'B', 'C', 'D'][:obj.numero_grupos]:
