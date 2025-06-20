@@ -17,13 +17,13 @@ El sistema de logging de GoolStar está configurado para:
 
 ## Niveles de Logging
 
-| Nivel | Uso recomendado | Ejemplo |
-|-------|----------------|---------|
-| DEBUG | Información detallada para depuración | "Procesando registro ID=123" |
-| INFO | Confirmación de operaciones normales | "Usuario autenticado correctamente" |
-| WARNING | Situaciones inesperadas pero no críticas | "Formato de fecha inválido, usando valor por defecto" |
-| ERROR | Errores que impiden una operación específica | "No se pudo guardar el partido por datos inválidos" |
-| CRITICAL | Errores graves que pueden afectar toda la app | "Conexión a base de datos perdida" |
+| Nivel    | Uso recomendado                               | Ejemplo                                               |
+|----------|-----------------------------------------------|-------------------------------------------------------|
+| DEBUG    | Información detallada para depuración         | "Procesando registro ID=123"                          |
+| INFO     | Confirmación de operaciones normales          | "Usuario autenticado correctamente"                   |
+| WARNING  | Situaciones inesperadas pero no críticas      | "Formato de fecha inválido, usando valor por defecto" |
+| ERROR    | Errores que impiden una operación específica  | "No se pudo guardar el partido por datos inválidos"   |
+| CRITICAL | Errores graves que pueden afectar toda la app | "Conexión a base de datos perdida"                    |
 
 ## Cómo utilizar el logging en el código
 
@@ -44,19 +44,19 @@ Ejemplos:
 
 ```python
 # Información de depuración (desarrollo)
-logger.debug("Procesando partido {} con opciones: {}".format(partido_id, opciones))
+###logger.debug("Procesando partido {} con opciones: {}".format(partido_id, opciones))
 
 # Operaciones normales
-logger.info("Partido {} guardado correctamente".format(partido_id))
+###logger.info("Partido {} guardado correctamente".format(partido_id))
 
 # Advertencias
-logger.warning("Fecha {} posiblemente incorrecta".format(fecha))
+###logger.warning("Fecha {} posiblemente incorrecta".format(fecha))
 
 # Errores
-logger.error("Error al procesar partido {}: {}".format(partido_id, str(e)))
+###logger.error("Error al procesar partido {}: {}".format(partido_id, str(e)))
 
 # Errores críticos (con stack trace completo)
-logger.critical("Fallo en la conexión a la base de datos", exc_info=True)
+###logger.critical("Fallo en la conexión a la base de datos", exc_info=True)
 ```
 
 ### 3. Utilizar decoradores para logging automático
@@ -72,13 +72,14 @@ from api.utils.logging_utils import get_logger, log_api_request
 
 logger = get_logger(__name__)
 
-@log_api_request(logger)
-def mi_vista(request):
-    # Tu código aquí
-    return Response(...)
+###@log_api_request(logger)
+###def mi_vista(request):
+# Tu código aquí
+###    return Response(...)
 ```
 
 Este decorador registra automáticamente:
+
 - La solicitud entrante (método, ruta, dirección IP)
 - Parámetros (si DEBUG está activado)
 - Tiempo de respuesta
@@ -91,7 +92,8 @@ Ejemplo:
 ```python
 from api.utils.logging_utils import log_db_operation
 
-@log_db_operation(logger)
+
+# @log_db_operation(logger)
 def actualizar_estadisticas(equipo_id):
     # Operaciones de base de datos
     pass
@@ -104,7 +106,8 @@ Ejemplo:
 ```python
 from api.utils.tz_logging import log_timezone_operation
 
-@log_timezone_operation(logger)
+
+###@log_timezone_operation(logger)
 def procesar_fechas_partidos(fecha_inicio, fecha_fin):
     # Operaciones con fechas y zonas horarias
     pass
@@ -118,11 +121,12 @@ GoolStar incluye utilidades específicas para detectar y registrar problemas rel
 from api.utils.tz_logging import detect_naive_datetime, log_date_conversion
 
 # Detectar fechas sin zona horaria
-if detect_naive_datetime(fecha, logger):
-    # Manejar el problema
+#if detect_naive_datetime(fecha, logger):
+# Aquí iría el código para manejar fechas sin zona horaria
+# Por ejemplo: fecha = fecha.replace(tzinfo=timezone.utc)    # Manejar el problema
 
 # Registrar conversiones de fecha
-log_date_conversion(fecha_original, fecha_convertida, logger)
+###log_date_conversion(fecha_original, fecha_convertida, logger)
 ```
 
 ## Archivos de Log
@@ -146,7 +150,8 @@ Este middleware está configurado automáticamente en settings.py y no requiere 
 
 ## Notificaciones por Email
 
-En producción, los errores se envían automáticamente por email a los administradores configurados en la variable `ADMINS` del archivo `.env`.
+En producción, los errores se envían automáticamente por email a los administradores configurados en la variable
+`ADMINS` del archivo `.env`.
 
 ## Herramientas de Análisis de Logs
 
@@ -205,7 +210,8 @@ python -m api.utils.scheduled_tasks check_timezone
 5. **Agregue stack traces cuando sea útil**: Use `exc_info=True` para errores importantes
 6. **Contextualice excepciones**: En lugar de solo registrar `str(e)`, añada contexto sobre lo que estaba haciendo
 7. **Utilice los decoradores de logging**: Aproveche `log_api_request`, `log_db_operation` y `log_timezone_operation`
-8. **Preste especial atención a las fechas**: Use siempre las utilidades de `date_utils.py` y registre problemas con `tz_logging.py`
+8. **Preste especial atención a las fechas**: Use siempre las utilidades de `date_utils.py` y registre problemas con
+   `tz_logging.py`
 
 ## Ejemplo completo
 
