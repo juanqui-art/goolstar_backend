@@ -22,6 +22,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copiar el proyecto
 COPY . .
 
+# Crear directorio de logs necesario para Django logging
+RUN mkdir -p /app/logs
+
 # Recolectar archivos estáticos
 RUN python manage.py collectstatic --noinput
 
