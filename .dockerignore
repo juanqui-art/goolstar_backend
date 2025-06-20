@@ -40,8 +40,12 @@
 
 # Archivos de Django
 **/*.log
+**/logs
+**/log
+**/*.log.*
 **/local_settings.py
 **/db.sqlite3
+**/db_local.sqlite3
 **/media
 **/staticfiles
 **/static
@@ -66,6 +70,24 @@
 **/*.cover
 **/.hypothesis
 
+# Documentación y archivos de desarrollo
+**/*.md
+**/docs
+**/README.*
+**/benchmark_*.py
+**/test_*.py
+**/*_test.py
+
+# Cache adicional de herramientas
+**/.pytest_cache
+**/.mypy_cache
+**/node_modules
+
+# Configuraciones de desarrollo específicas
+**/settings_debug.py
+**/settings_query_log.py
+**/settings_local.py
+
 # Otros
 **/*.pot
 **/*.mo
@@ -84,4 +106,10 @@
 # Datasource local storage ignored files
 .idea/dataSources
 .idea/dataSources.local.xml
-fly.toml
+
+# Archivos específicos del proyecto no necesarios en producción
+.claude
+test_jwt_auth.py
+
+# Mantener fly.toml comentado - puede ser necesario para deployment
+# fly.toml
