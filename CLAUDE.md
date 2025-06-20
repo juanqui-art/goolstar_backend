@@ -10,6 +10,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - **Create migrations**: `python manage.py makemigrations`
 - **Apply migrations**: `python manage.py migrate`
 - **Cache management**: `python manage.py cache_management --action test|stats|clear`
+- **Lint code**: `flake8`
+- **Check types**: `mypy .`
+
+## Dependencies Management
+
+- **Production install**: `pip install -r requirements.txt`
+- **Development install**: `pip install -r requirements.txt -r requirements-dev.txt`
+- **Security audit**: `pip-audit` (dev only)
+- **Dependency tree**: `pipdeptree` (dev only)
 
 ## Architecture Overview
 

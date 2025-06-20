@@ -1,53 +1,40 @@
-# Paquetes principales
+# Core Django and API
 Django==5.2.3
 djangorestframework==3.15.2
-django-filter==25.1  # Agregado para DjangoFilterBackend
+django-filter==25.1
 
-# Base de datos
+# Database
 psycopg2-binary==2.9.10
 dj-database-url==2.1.0
 
-# Autenticación y seguridad
+# Authentication and Security
 djangorestframework-simplejwt==5.4.0
-PyJWT==2.9.0
 python-dotenv==1.0.0
 django-ratelimit==4.1.0
 
-# Cache con Redis
+# Cache
 redis==5.0.1
 django-redis==5.4.0
 
-# CORS y seguridad HTTP
+# HTTP and CORS
 django-cors-headers==4.3.1
 whitenoise==6.6.0
 
-# Documentación de API
-drf-yasg==1.21.7
-uritemplate==4.1.1
+# API Documentation (production-ready)
 drf-spectacular==0.28.0
 
-# Manejo de imágenes, PDFs y archivos estáticos
+# File Processing
 Pillow==10.3.0
 xhtml2pdf==0.2.17
 reportlab==4.4.1
 
-# Cloudinary para almacenamiento en la nube
+# Cloud Storage
 django-cloudinary-storage==0.3.0
 cloudinary==1.37.0
 python-magic==0.4.27
 
-# Servidor WSGI
+# WSGI Server
 gunicorn==23.0.0
 
-# Dependencias de Django (se instalarán automáticamente)
-asgiref==3.8.1
-sqlparse==0.5.3
-pytz==2025.2
-
-# Otras dependencias necesarias
-certifi==2025.4.26
-charset-normalizer==3.4.2
-idna==3.10
-requests==2.32.3
-urllib3==2.4.0
-PyYAML==6.0.2
+# HTTP Client (for external API calls)
+requests==2.32.4

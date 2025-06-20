@@ -61,7 +61,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',  # Para autenticación basada en tokens
     'corsheaders',
-    'drf_yasg',  # Para la documentación de la API
     'rest_framework_simplejwt',  # Para autenticación con JWT
     'rest_framework_simplejwt.token_blacklist',  # Añadido para permitir blacklist de tokens
     'drf_spectacular',
