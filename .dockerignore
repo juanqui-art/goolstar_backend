@@ -50,8 +50,6 @@
 # */migrations/*.py
 **/*/migrations/__pycache__
 
-# Archivos de imágenes y archivos subidos por usuarios
-**/media
 
 # Archivos del sistema operativo
 **/.DS_Store
