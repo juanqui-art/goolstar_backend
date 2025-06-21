@@ -24,28 +24,38 @@ ENV GUNICORN_KEEPALIVE=5
 ENV GUNICORN_MAX_REQUESTS=800
 ENV GUNICORN_MAX_REQUESTS_JITTER=50
 
-# Instalar dependencias del sistema necesarias para python-magic
+# Instalar dependencias del sistema y Python con limpieza optimizada
+COPY requirements.txt .
 RUN apt-get update && apt-get install -y \
     libmagic1 \
     libmagic-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Actualizar pip y instalar dependencias de Python
-COPY requirements.txt .
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+    && pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt \
+    && apt-get remove -y libmagic-dev \
+    && apt-get autoremove -y \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache/pip/*
 
 # Copiar el proyecto
 COPY . .
 
-# Crear directorio de logs necesario para Django logging
-RUN mkdir -p /app/logs
+# Crear usuario no-root para seguridad
+RUN groupadd -r django && useradd -r -g django django
 
-# Recolectar archivos estáticos
-RUN python manage.py collectstatic --noinput
+# Crear directorio de logs con permisos correctos
+RUN mkdir -p /app/logs && \
+    touch /app/logs/debug.log && \
+    chown -R django:django /app
+
+# Recolectar archivos estáticos como root, luego ajustar permisos
+RUN python manage.py collectstatic --noinput && \
+    chown -R django:django /app/staticfiles /app/logs
 
 # Exponer el puerto - esto es muy importante para Fly.io
 EXPOSE ${PORT}
+
+# Cambiar a usuario no-root
+USER django
 
 # Health check básico para monitoreo
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
