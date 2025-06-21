@@ -79,3 +79,8 @@ coverage.xml
 /CLAUDE.md
 /ADMIN_PERFORMANCE_SUMMARY.md
 /api/admin_performance_notes.md
+/fly.toml.backup
+/Dockerfile.multistage
+/Dockerfile.optimized
+/latency_test.py
+/VERCEL_REGION_CONFIG.md
