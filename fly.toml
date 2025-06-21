@@ -4,7 +4,7 @@
 #
 
 app = 'goolstar-backend'
-primary_region = 'mia'
+primary_region = 'lax'
 
 [build]
   dockerfile = 'Dockerfile'
